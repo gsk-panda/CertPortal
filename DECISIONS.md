@@ -154,11 +154,18 @@ production multi-tenant deployment; all are overridable where noted.
 - **Feature-flagged**: `BILLING_ENABLED` (default off). Off = the app behaves
   exactly as before — `planForOrg` returns an unrestricted pseudo-plan, no
   limits, no billing UI. Existing/self-hosted installs are unaffected.
-- **Flat per-customer tiers** (trial/starter/pro/enterprise) defined in code
+- **Flat per-customer tiers** (free/starter/pro/enterprise; legacy trial) defined in code
   (`services/billing/plans.js`); limits + feature flags per tier, Stripe Price
   IDs from env so the same code runs against test/live Stripe.
 - **Grandfathering**: migration defaults existing orgs to `enterprise`
-  (unrestricted); new self-serve signups start on `trial` with `trial_ends_at`.
+  (unrestricted); new self-serve signups start on `free` (1 domain, 1 cert,
+  1 firewall, 1 agent, never expires). Migration 005 moves any `trial` orgs to
+  `free`. A cancelled subscription drops the org back to `free` instead of
+  locking it out; resources over the free limits keep renewing, but adding
+  more needs an upgrade.
+- **Plan changes for paying orgs** update the existing Stripe subscription
+  (prorated) rather than starting a new Checkout, so nobody is billed twice.
+  Platform admins can also set an org's plan by hand on `/admin`.
 - **org.status stays admin-controlled.** Billing standing is derived from the
   subscription row + trial window (`inGoodStanding`), enforced by a
   `billingGate` middleware on feature routers — but NOT on `/billing` or
@@ -170,7 +177,7 @@ production multi-tenant deployment; all are overridable where noted.
   via `billing_events`) mirrors subscription state. All Stripe calls behind a
   lazy client so tests need no keys.
 - **Self-serve signup** (`SIGNUP_ENABLED`) creates org + first client_admin and
-  starts the trial — the only path that bypasses invite-only onboarding.
+  puts it on the free plan — the only path that bypasses invite-only onboarding.
 
 ## On-prem agent (Phase 2)
 

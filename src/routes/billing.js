@@ -20,6 +20,7 @@ async function usage(orgId) {
     firewalls: await q('firewalls'),
     domains: await q('domains'),
     certificates: await q('certificates'),
+    agents: await q('agents'),
   };
 }
 
@@ -46,6 +47,14 @@ router.post('/checkout', requireOrgWrite,
     try {
       if (!config.billing.stripeSecretKey) {
         req.session.flash = { type: 'error', message: 'Billing is not fully configured yet — contact support.' };
+        return res.redirect('/billing');
+      }
+      const sub = (await query('SELECT stripe_subscription_id, status FROM subscriptions WHERE org_id = $1', [req.orgId])).rows[0];
+      if (sub && sub.stripe_subscription_id && sub.status !== 'canceled') {
+        // already subscribed: switch the existing subscription's plan
+        await billing.changePlan(req.org, sub.stripe_subscription_id, req.body.plan);
+        await auditReq(req, 'billing.plan_changed', 'organization', req.orgId, { plan: req.body.plan });
+        req.session.flash = { type: 'success', message: 'Your plan has been changed. Any difference is prorated on your next invoice.' };
         return res.redirect('/billing');
       }
       const url = await billing.checkoutUrl(req.org, req.body.plan, {

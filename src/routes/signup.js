@@ -9,6 +9,7 @@ const { query, withTransaction } = require('../db/pool');
 const { config } = require('../config');
 const { audit } = require('../services/audit');
 const { validateBody } = require('../middleware/validate');
+const { PLANS } = require('../services/billing/plans');
 
 const router = express.Router();
 
@@ -23,7 +24,7 @@ function guard(req, res, next) {
 
 router.get('/', guard, (req, res) => {
   if (req.session.user) return res.redirect('/');
-  res.render('auth/signup', { title: 'Start your free trial', trialDays: config.billing.trialDays });
+  res.render('auth/signup', { title: 'Create your free account', freeLimits: PLANS.free.limits });
 });
 
 router.post('/', guard, signupLimiter,
@@ -48,9 +49,9 @@ router.post('/', guard, signupLimiter,
       const hash = await argon2.hash(req.body.password, { type: argon2.argon2id });
       const result = await withTransaction(async (client) => {
         const org = (await client.query(
-          `INSERT INTO organizations (name, contact_email, plan, trial_ends_at, status)
-           VALUES ($1,$2,'trial', now() + make_interval(days => $3), 'active') RETURNING id, name`,
-          [req.body.org_name, email, config.billing.trialDays]
+          `INSERT INTO organizations (name, contact_email, plan, status)
+           VALUES ($1,$2,'free','active') RETURNING id, name`,
+          [req.body.org_name, email]
         )).rows[0];
         const user = (await client.query(
           `INSERT INTO users (org_id, email, password_hash, role) VALUES ($1,$2,$3,'client_admin') RETURNING id, email, role, org_id`,
@@ -63,8 +64,8 @@ router.post('/', guard, signupLimiter,
       await new Promise((resolve, reject) => req.session.regenerate((e) => e ? reject(e) : resolve()));
       req.session.user = { id: result.user.id, email: result.user.email, role: result.user.role, orgId: result.user.org_id };
       await query('UPDATE users SET last_login = now() WHERE id = $1', [result.user.id]);
-      req.session.flash = { type: 'success', message: `Welcome! Your ${config.billing.trialDays}-day trial has started. Choose a plan any time on the Billing page.` };
-      res.redirect('/billing');
+      req.session.flash = { type: 'success', message: 'Welcome! Your free account is ready. Upgrade any time on the Billing page to add more.' };
+      res.redirect('/dashboard');
     } catch (err) {
       if (err.code === '23505') {
         req.session.flash = { type: 'error', message: 'That organization name or email is already taken.' };

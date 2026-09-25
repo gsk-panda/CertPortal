@@ -9,6 +9,7 @@ const { validateBody } = require('../middleware/validate');
 const { createAgent } = require('../services/agent/service');
 const { auditReq } = require('../services/audit');
 const { config } = require('../config');
+const { checkLimit } = require('../services/billing/entitlements');
 
 const router = express.Router();
 
@@ -34,6 +35,11 @@ router.post('/', requireOrgWrite,
   validateBody(z.object({ name: z.string().trim().min(1).max(80), _csrf: z.string() })),
   async (req, res, next) => {
     try {
+      const lim = await checkLimit(req, 'agents');
+      if (!lim.ok) {
+        req.session.flash = { type: 'error', message: `Your ${lim.plan.label} plan includes ${lim.limit} agent(s). Upgrade on the Billing page to add more.` };
+        return res.redirect('/billing');
+      }
       const { agentId, enrollmentToken } = await createAgent(req.orgId, req.body.name);
       await auditReq(req, 'agent.created', 'agent', agentId, { name: req.body.name });
       // shown once so the operator can install the agent

@@ -9,6 +9,10 @@
   <% } %>
 </div>
 
+<% if (plan.key === 'free') { %>
+  <div class="panel">You're on the free plan. Upgrade below for more domains, certificates, firewalls and agents.</div>
+<% } %>
+
 <% if (!standing) { %>
   <div class="banner-warn"><%= plan.key === 'trial' ? 'Your free trial has ended.' : 'Your subscription is inactive.' %>
   Choose a plan below to restore full access.</div>
@@ -17,7 +21,7 @@
 <div class="panel">
   <div class="kv">
     <dt>Current plan</dt><dd><strong><%= plan.label %></strong></dd>
-    <dt>Status</dt><dd><span class="badge <%= standing ? 'green' : 'red' %>"><%= subscription ? subscription.status : (plan.key === 'trial' ? 'trialing' : 'active') %></span></dd>
+    <dt>Status</dt><dd><span class="badge <%= standing ? 'green' : 'red' %>"><%= plan.key === 'free' ? 'active' : (subscription ? subscription.status : (plan.key === 'trial' ? 'trialing' : 'active')) %></span></dd>
     <% if (plan.key === 'trial' && trialEndsAt) { %>
       <dt>Trial ends</dt><dd><%= new Date(trialEndsAt).toISOString().slice(0,10) %></dd>
     <% } %>
@@ -35,6 +39,7 @@
     <tr><td>Firewalls</td><td><%= usage.firewalls %></td><td><%= fmt(plan.limits.firewalls) %></td></tr>
     <tr><td>Domains</td><td><%= usage.domains %></td><td><%= fmt(plan.limits.domains) %></td></tr>
     <tr><td>Certificates</td><td><%= usage.certificates %></td><td><%= fmt(plan.limits.certificates) %></td></tr>
+    <tr><td>Agents</td><td><%= usage.agents %></td><td><%= fmt(plan.limits.agents) %></td></tr>
   </tbody>
 </table>
 
@@ -50,6 +55,7 @@
         <li><%= p.limits.firewalls === null ? 'Unlimited' : p.limits.firewalls %> firewalls</li>
         <li><%= p.limits.domains === null ? 'Unlimited' : p.limits.domains %> domains</li>
         <li><%= p.limits.certificates === null ? 'Unlimited' : p.limits.certificates %> certificates</li>
+        <li><%= p.limits.agents === null ? 'Unlimited' : p.limits.agents %> agents</li>
         <li><%= p.features.monitoring ? '✓' : '—' %> monitoring</li>
         <li><%= p.features.panovision ? '✓' : '—' %> Panovision (log search)</li>
         <li><%= p.features.change_mgmt ? '✓' : '—' %> change management</li>
