@@ -15,8 +15,10 @@ $Shortcut = Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs\Ce
 $Logs = (Get-Location).Path   # msiexec logs land here
 
 function DumpLogs {
-  Get-ChildItem "$DataDir\logs" -ErrorAction SilentlyContinue | ForEach-Object {
-    Write-Host "--- $($_.Name)"; Get-Content $_.FullName -Tail 40
+  Write-Host '--- data folder permissions'
+  icacls $DataDir /T 2>&1 | Out-Host
+  Get-ChildItem "$DataDir\logs", "$env:WINDIR\SystemTemp\certportal-agent-installer.log" -ErrorAction SilentlyContinue | ForEach-Object {
+    Write-Host "--- $($_.Name)"; Get-Content $_.FullName -Tail 40 -ErrorAction Continue
   }
 }
 
@@ -100,7 +102,7 @@ try {
   if (Test-Path $Shortcut) { Fail 'Start menu shortcut still exists' }
   Pass 'uninstalled cleanly'
 }
-catch { DumpLogs; throw }
+catch { Write-Host "FAIL: $_" -ForegroundColor Red; DumpLogs; throw }
 finally {
   Stop-Process -Id $mock.Id -ErrorAction SilentlyContinue
 }
