@@ -23,6 +23,7 @@ router.get('/', async (req, res, next) => {
       title: 'Agents',
       agents: rows,
       controlPlaneUrl: config.baseUrl,
+      agentMsiUrl: config.agentMsiUrl,
       newAgent: req.session.newAgent || null,
     });
     if (req.session.newAgent) delete req.session.newAgent;
@@ -35,7 +36,7 @@ router.post('/', requireOrgWrite,
     try {
       const { agentId, enrollmentToken } = await createAgent(req.orgId, req.body.name);
       await auditReq(req, 'agent.created', 'agent', agentId, { name: req.body.name });
-      // shown once so the operator can start the agent container
+      // shown once so the operator can install the agent
       req.session.newAgent = { name: req.body.name, token: enrollmentToken };
       res.redirect('/agents');
     } catch (err) {

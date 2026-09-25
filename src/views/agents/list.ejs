@@ -6,9 +6,14 @@
 <% if (newAgent) { %>
 <div class="panel req-panel">
   <h3 style="margin-top:0">Agent “<%= newAgent.name %>” created — enroll it now</h3>
-  <p style="font-size:.9rem">Run the agent on a host inside the network that can reach your firewalls. It connects
+  <p style="font-size:.9rem">Install the agent on a Windows or Linux host inside the network that can reach your firewalls. It connects
   <strong>out</strong> to <span class="mono"><%= controlPlaneUrl %></span>; nothing inbound is opened. This enrollment
   token is shown once.</p>
+  <h4>Windows</h4>
+  <p style="font-size:.85rem"><a href="<%= agentMsiUrl %>">Download certportal-agent.msi</a>, then run this in an
+  administrator PowerShell in the folder you saved it to. It installs and starts the <span class="mono">CertPortal Agent</span> Windows service.</p>
+  <div class="record-box" data-copy>msiexec /i certportal-agent.msi CONTROL_PLANE_URL=<%= controlPlaneUrl %> ENROLL_TOKEN=<%= newAgent.token %> AGENT_NAME="<%= newAgent.name %>" /qb</div>
+  <h4>Linux (Docker)</h4>
   <div class="record-box" data-copy>docker run -d --name certportal-agent --restart unless-stopped \
   -e CONTROL_PLANE_URL=<%= controlPlaneUrl %> \
   -e ENROLL_TOKEN=<%= newAgent.token %> \

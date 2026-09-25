@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  CertPortal agent MSI. Built on Linux or macOS with wixl (msitools), which
+  reads WiX v3 syntax: node agent/windows/build.js, passing the msi flag.
+  build.js then sets two things wixl can't express (see fixMsi there): the
+  secure public properties and HideTarget on ConfigureAgent.
+
+  Install (elevated):
+    msiexec /i certportal-agent.msi ENROLL_TOKEN=<token> AGENT_NAME="datacenter-1" /qb
+  Optional: CONTROL_PLANE_URL=<url> (defaults to the ControlPlaneUrl build variable).
+
+  Installs certportal-agent.exe + the WinSW wrapper to Program Files, registers
+  the CertPortalAgent service (LocalService, auto start, restart on failure),
+  writes the config to %ProgramData%\CertPortal\Agent and starts the service.
+  Uninstall removes that folder too (credentials, logs); upgrades keep it.
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*" Name="CertPortal Agent" Manufacturer="CertPortal" Version="$(var.Version)" Language="1033"
+           UpgradeCode="7ab9422e-9a57-4fca-b661-573267768bde">
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" Description="CertPortal Agent $(var.Version)" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of CertPortal Agent is already installed." />
+    <Media Id="1" Cabinet="agent.cab" EmbedCab="yes" />
+
+    <Property Id="CONTROL_PLANE_URL" Value="$(var.ControlPlaneUrl)" Secure="yes" />
+    <Property Id="ENROLL_TOKEN" Secure="yes" />
+    <Property Id="MsiHiddenProperties" Value="ENROLL_TOKEN" />
+    <Property Id="AGENT_NAME" Secure="yes" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+
+    <Condition Message="An enrollment token is required. In CertPortal, go to Agents, add an agent and run the install command shown there (it includes ENROLL_TOKEN=...).">Installed OR ENROLL_TOKEN OR WIX_UPGRADE_DETECTED</Condition>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="CompanyFolder" Name="CertPortal">
+          <Directory Id="INSTALLFOLDER" Name="Agent">
+            <Component Id="AgentExe" Guid="*" Win64="yes">
+              <File Id="AgentExe" Source="$(var.DistDir)/certportal-agent.exe" Name="certportal-agent.exe" KeyPath="yes" />
+            </Component>
+            <Component Id="ServiceXml" Guid="*" Win64="yes">
+              <File Id="ServiceXml" Source="$(var.DistDir)/certportal-agent-service.xml" Name="certportal-agent-service.xml" KeyPath="yes" />
+            </Component>
+            <Component Id="ServiceExe" Guid="*" Win64="yes">
+              <File Id="ServiceExe" Source="$(var.DistDir)/certportal-agent-service.exe" Name="certportal-agent-service.exe" KeyPath="yes" />
+              <ServiceInstall Id="AgentService" Name="CertPortalAgent" DisplayName="CertPortal Agent"
+                              Description="Outbound-only connector that lets CertPortal manage firewalls on this network."
+                              Type="ownProcess" Start="auto" ErrorControl="normal"
+                              Account="NT AUTHORITY\LocalService" Vital="yes" />
+              <ServiceControl Id="AgentServiceControl" Name="CertPortalAgent"
+                              Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+            </Component>
+          </Directory>
+        </Directory>
+      </Directory>
+    </Directory>
+
+    <Feature Id="Main" Level="1">
+      <ComponentRef Id="AgentExe" />
+      <ComponentRef Id="ServiceXml" />
+      <ComponentRef Id="ServiceExe" />
+    </Feature>
+
+    <!-- all run as SYSTEM from the installed exe -->
+    <CustomAction Id="ConfigureAgent" FileKey="AgentExe"
+                  ExeCommand="configure --url &quot;[CONTROL_PLANE_URL]&quot; --token &quot;[ENROLL_TOKEN]&quot; --name &quot;[AGENT_NAME]&quot;"
+                  Execute="deferred" Impersonate="no" Return="check" HideTarget="yes" />
+    <CustomAction Id="SetFailureActions" FileKey="AgentExe"
+                  ExeCommand="set-recovery"
+                  Execute="deferred" Impersonate="no" Return="ignore" />
+    <CustomAction Id="PurgeAgentData" FileKey="AgentExe"
+                  ExeCommand="purge"
+                  Execute="deferred" Impersonate="no" Return="ignore" />
+    <InstallExecuteSequence>
+      <Custom Action="SetFailureActions" After="InstallServices">NOT (REMOVE~="ALL")</Custom>
+      <Custom Action="ConfigureAgent" Before="StartServices">ENROLL_TOKEN AND NOT (REMOVE~="ALL")</Custom>
+      <Custom Action="PurgeAgentData" After="StopServices">REMOVE~="ALL" AND NOT UPGRADINGPRODUCTCODE</Custom>
+    </InstallExecuteSequence>
+  </Product>
+</Wix>
