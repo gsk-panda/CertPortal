@@ -57,13 +57,51 @@ function writeJson(file, data) {
 // On Windows the 0600 file mode is ignored, so the data folder's ACL is what
 // protects the agent secret: SYSTEM + Administrators full, LocalService (the
 // service account) modify, nothing inherited. SIDs avoid localized names.
-function lockDownDataDir(dir) {
+function lockDownDataDir(dir, createdNow) {
   if (!IS_WINDOWS) return;
-  // take ownership first: ProgramData lets any user pre-create this folder
-  execFileSync('icacls', [dir, '/setowner', '*S-1-5-32-544', '/T', '/C', '/Q'], { stdio: 'inherit', windowsHide: true });
-  execFileSync('icacls', [dir, '/inheritance:r', '/grant:r',
-    '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-544:(OI)(CI)F', '*S-1-5-19:(OI)(CI)M', '/T', '/C', '/Q'],
-  { stdio: 'inherit', windowsHide: true });
+  // Take ownership first: ProgramData lets any user pre-create this folder.
+  // If we just created it ourselves (as SYSTEM) nobody else can own it, so a
+  // failure here is only fatal for a folder that already existed.
+  try {
+    run('icacls', [dir, '/setowner', '*S-1-5-32-544', '/T', '/C', '/Q']);
+  } catch (err) {
+    if (!createdNow) throw err;
+    installerLog(`warning: ${err.message}`);
+  }
+  run('icacls', [dir, '/inheritance:r', '/grant:r',
+    '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-544:(OI)(CI)F', '*S-1-5-19:(OI)(CI)M', '/T', '/C', '/Q']);
+}
+
+// The installer runs these commands with no console, where writing to stdout
+// can itself fail, so they report to a log file instead and never inherit stdio.
+// Only configure creates the data folder, so it can tell whether the folder
+// existed before it (see lockDownDataDir); the other commands log only if it's there.
+function installerLog(message, { create = true } = {}) {
+  try {
+    if (!create && !fs.existsSync(DATA_DIR)) return;
+    const dir = path.join(DATA_DIR, 'logs');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.appendFileSync(path.join(dir, 'installer.log'), `${new Date().toISOString()} ${message}\n`);
+  } catch { /* nowhere left to report */ }
+}
+
+function run(cmd, args) {
+  try {
+    execFileSync(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  } catch (err) {
+    const out = `${err.stdout || ''}${err.stderr || ''}`.trim();
+    throw new Error(`${cmd} ${args.join(' ')} failed (${err.status ?? err.code}): ${out || err.message}`);
+  }
+}
+
+function installerCommand(name, fn, opts) {
+  try {
+    fn();
+    installerLog(`${name}: ok`, opts);
+  } catch (err) {
+    installerLog(`${name} failed: ${err.stack || err.message}`, opts);
+    process.exitCode = 1;
+  }
 }
 
 function parseArgs(argv) {
@@ -87,27 +125,26 @@ function configure(argv) {
   }
   if (args.name) current.AGENT_NAME = args.name;
   if (args.insecure) current.CONTROL_PLANE_INSECURE = 'true';
-  if (!current.CONTROL_PLANE_URL) { console.error('configure: --url is required'); process.exit(2); }
-  fs.mkdirSync(path.dirname(CONFIG_FILE), { recursive: true });
-  lockDownDataDir(path.dirname(CONFIG_FILE));
+  if (!current.CONTROL_PLANE_URL) throw new Error('--url is required');
+  const dir = path.dirname(CONFIG_FILE);
+  const createdNow = !fs.existsSync(dir);
+  fs.mkdirSync(dir, { recursive: true });
+  lockDownDataDir(dir, createdNow);
   writeJson(CONFIG_FILE, current);
-  console.log(`[agent] wrote ${CONFIG_FILE}`);
 }
 
 // Service recovery: restart 10s after any failure, including a clean exit with
 // an error code (failureflag), which is how WinSW reports the agent dying.
 function setRecovery() {
-  if (!IS_WINDOWS) { console.error('set-recovery is only used by the Windows installer'); process.exit(2); }
-  execFileSync('sc.exe', ['failure', 'CertPortalAgent', 'reset=', '86400',
-    'actions=', 'restart/10000/restart/10000/restart/10000'], { stdio: 'inherit', windowsHide: true });
-  execFileSync('sc.exe', ['failureflag', 'CertPortalAgent', '1'], { stdio: 'inherit', windowsHide: true });
+  if (!IS_WINDOWS) throw new Error('set-recovery is only used by the Windows installer');
+  run('sc.exe', ['failure', 'CertPortalAgent', 'reset=', '86400', 'actions=', 'restart/10000/restart/10000/restart/10000']);
+  run('sc.exe', ['failureflag', 'CertPortalAgent', '1']);
 }
 
 // uninstall: remove the config, credentials and logs
 function purge() {
-  if (!IS_WINDOWS) { console.error('purge is only used by the Windows uninstaller'); process.exit(2); }
+  if (!IS_WINDOWS) throw new Error('purge is only used by the Windows uninstaller');
   fs.rmSync(DATA_DIR, { recursive: true, force: true });
-  console.log(`[agent] removed ${DATA_DIR}`);
 }
 
 // Config file values fill in anything not set in the environment. They go into
@@ -286,8 +323,8 @@ function agent() {
 
 const [cmd, ...rest] = process.argv.slice(2);
 if (cmd === '--version' || cmd === 'version') console.log(VERSION);
-else if (cmd === 'configure') configure(rest);
-else if (cmd === 'purge') purge();
-else if (cmd === 'set-recovery') setRecovery();
+else if (cmd === 'configure') installerCommand('configure', () => configure(rest));
+else if (cmd === 'purge') purge(); // logging here would recreate the folder it just removed
+else if (cmd === 'set-recovery') installerCommand('set-recovery', setRecovery, { create: false });
 else if (cmd === 'status') printStatus();
 else agent();

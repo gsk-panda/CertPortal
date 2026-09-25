@@ -63,6 +63,7 @@ try {
   if ($cfg.PSObject.Properties.Name -contains 'ENROLL_TOKEN') { Fail 'config.json still holds the enrollment token' }
   if ($cfg.CONTROL_PLANE_URL -ne $Url -or $cfg.AGENT_NAME -ne 'ci agent') { Fail "config.json: $($cfg | ConvertTo-Json -Compress)" }
   if (-not (Test-Path "$DataDir\agent.json")) { Fail 'agent.json missing' }
+  if (-not (Select-String -Path "$DataDir\logs\installer.log" -Pattern 'configure: ok' -Quiet)) { Fail 'installer.log has no configure: ok' }
   Pass 'config written, token removed after enrollment'
 
   $st = Invoke-RestMethod 'http://127.0.0.1:47801/status.json'
