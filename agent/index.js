@@ -73,8 +73,12 @@ function lockDownDataDir(dir) {
   } else {
     fs.mkdirSync(dir, { recursive: true });
   }
+  // Set the folder's own ACL, then make everything already in it inherit
+  // from it. (Applying the folder ACL with /T would strip what files inherit
+  // and grant them nothing, as (OI)(CI) entries only apply to folders.)
   run('icacls', [dir, '/inheritance:r', '/grant:r',
-    '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-544:(OI)(CI)F', '*S-1-5-19:(OI)(CI)M', '/T', '/C', '/Q']);
+    '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-544:(OI)(CI)F', '*S-1-5-19:(OI)(CI)M', '/Q']);
+  if (fs.readdirSync(dir).length) run('icacls', [path.join(dir, '*'), '/reset', '/T', '/C', '/Q']);
 }
 
 // The installer runs these commands with no console, where writing to stdout
