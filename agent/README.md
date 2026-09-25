@@ -27,7 +27,57 @@ the LAN and posts the result back. Every connection is opened *by the agent*.
 
 ## Run it
 
-Create an agent in the portal (**Agents → Add**), copy the enrollment command:
+Create an agent in the portal (**Agents → Add**) and copy the install command it
+shows. It shows one command for Windows and one for Docker.
+
+### Windows (MSI)
+
+Download `certportal-agent.msi` (linked from the Agents page; built by the
+`Windows agent MSI` workflow and attached to `agent-v*` releases). Then, in an
+administrator PowerShell:
+
+```powershell
+msiexec /i certportal-agent.msi CONTROL_PLANE_URL=https://certportal.example ENROLL_TOKEN=<one-time-token> AGENT_NAME="datacenter-1" /qb
+```
+
+Use `/qn` instead of `/qb` for a fully silent install (e.g. from Intune or
+SCCM). The MSI:
+
+- installs `certportal-agent.exe` (the agent with its own Node runtime, no
+  prerequisites) and the WinSW service wrapper to `C:\Program Files\CertPortal\Agent`
+- registers and starts the **CertPortal Agent** service (automatic start,
+  `LocalService` account, restarts 10s after any crash)
+- writes `CONTROL_PLANE_URL` / `ENROLL_TOKEN` / `AGENT_NAME` to
+  `C:\ProgramData\CertPortal\Agent\config.json` and restricts that folder to
+  SYSTEM, Administrators and LocalService. The token is removed from the file
+  once the agent enrolls and is kept out of the install log.
+- trusts the Windows certificate store (corporate CAs, TLS-inspecting proxies)
+  and honours a machine-wide `HTTPS_PROXY`
+
+To check on it, open **CertPortal Agent Status** from the Start menu. It
+shows whether the agent is connected to the portal, when it last checked in,
+the jobs it has run and the last error, and refreshes every 5 seconds. The page
+is served by the agent on `http://127.0.0.1:47801/` (this machine only; set
+`AGENT_STATUS_PORT` in `config.json` to change it or `off` to disable), and
+`certportal-agent status` prints the same thing as JSON. Logs are in
+`C:\ProgramData\CertPortal\Agent\logs`. Installing a newer MSI
+upgrades in place and keeps the enrollment; passing a new `ENROLL_TOKEN`
+re-enrolls. Uninstalling (Apps & features, or `msiexec /x`) removes the service
+and the ProgramData folder, credentials included; delete the agent in the
+portal as well.
+
+Build it yourself on Linux or macOS with Node 24 and msitools
+(`apt install wixl msitools`):
+
+```bash
+cd agent && npm install && node windows/build.js --msi   # -> windows/dist/certportal-agent.msi
+```
+
+`agent/windows/test/install-test.ps1` installs the MSI against a mock control
+plane and checks enrollment, permissions, crash restart and uninstall. CI runs
+it on every change.
+
+### Docker
 
 ```bash
 docker run -d --name certportal-agent --restart unless-stopped \
@@ -49,14 +99,19 @@ page, set **Connection → Via agent: datacenter-1**.
 | `CONTROL_PLANE_URL` | Base URL of the control plane (required) |
 | `ENROLL_TOKEN` | One-time enrollment token (first run only) |
 | `AGENT_NAME` | Informational label |
-| `AGENT_STATE_FILE` | Credential store (default `/data/agent.json`) |
+| `AGENT_STATE_FILE` | Credential store (default `/data/agent.json`, Windows `%ProgramData%\CertPortal\Agent\agent.json`) |
+| `AGENT_STATUS_PORT` | Local status page on `127.0.0.1` (default `47801` on Windows, off elsewhere; `off` disables) |
+| `AGENT_CONFIG_FILE` | Optional JSON file with any of these keys; env wins (default `config.json` next to the state file) |
 | `CONTROL_PLANE_INSECURE` | `true` to accept a self-signed control-plane cert |
 | `FIREWALL_CA_BUNDLE` | PEM to authenticate firewall mgmt certs when verify-TLS is on |
 
 ## Security
 
-- Outbound-only; nothing listens on the agent.
-- Credentials are stored `0600` in the state volume.
+- Outbound-only. The only listener is the read-only status page, bound to
+  `127.0.0.1` (on by default on Windows only); it shows no secrets and rejects
+  requests for other host names.
+- Credentials are stored `0600` in the state volume (on Windows, in a folder
+  only SYSTEM, Administrators and the service account can read).
 - Firewall API keys and certificate material are sent to the agent per-job over
   TLS and are dropped from the control plane's job record once the job completes.
 - Build the image yourself from this repo to review exactly what runs.

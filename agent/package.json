@@ -1,13 +1,22 @@
 {
   "name": "certportal-agent",
-  "version": "1.0.0",
+  "version": "1.2.3",
   "private": true,
-  "description": "CertPortal on-prem agent — outbound-only connector to firewalls/Panorama",
+  "description": "CertPortal on-prem agent \u2014 outbound-only connector to firewalls/Panorama",
   "main": "index.js",
-  "scripts": { "start": "node index.js" },
-  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node index.js",
+    "build:windows": "node windows/build.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "axios": "^1.7.0",
     "fast-xml-parser": "^5.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "postject": "1.0.0-alpha.6"
   }
 }

@@ -46,6 +46,9 @@ const config = {
   // is on (firewall's own mgmt cert, or an internal CA). Enables authenticated
   // TLS to the firewall on on-prem deployments.
   firewallCaBundle: process.env.FIREWALL_CA_BUNDLE || '',
+  // Where the Agents page links to download the Windows agent installer.
+  agentMsiUrl: process.env.AGENT_MSI_URL
+    || 'https://github.com/gsk-panda/CertPortal/releases/latest/download/certportal-agent.msi',
   mockPanos: bool(process.env.MOCK_PANOS, false),
   mockPanosPort: parseInt(process.env.MOCK_PANOS_PORT || '9443', 10),
   smtp: {

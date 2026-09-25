@@ -200,6 +200,23 @@ production multi-tenant deployment; all are overridable where noted.
   `pipeline.runDeployment` only gathers inputs and records the result. So an
   agent-connected firewall gets the complete automated cert lifecycle with zero
   inbound access.
+- **Windows packaging (MSI)**: the same agent code ships as a Node single
+  executable (esbuild bundle injected into the official `node.exe`) wrapped by
+  WinSW as a Windows service, inside an MSI built with wixl (msitools), so the
+  whole thing builds on Linux; a Windows CI job test-installs it. Chosen over a
+  Go/.NET rewrite so the PAN-OS ops stay shared with the control plane. Service
+  restart-on-failure is set by `certportal-agent set-recovery` (sc.exe) because
+  wixl has no ServiceConfig support. Config comes from
+  `%ProgramData%\CertPortal\Agent\config.json`, written by the MSI through
+  `certportal-agent configure` (runs as SYSTEM, sets the folder ACL and owner);
+  runs as `LocalService`; uninstall purges the folder, upgrades keep it. The
+  exe embeds Node 24 (Node 20 is EOL) and trusts the Windows cert store.
+- **Agent status page**: on Windows the agent serves a read-only status page on
+  `127.0.0.1:47801` (Start menu shortcut) so an admin can see it is connected.
+  Loopback only, GET only, Host-checked against DNS rebinding, no secrets. It's
+  the one exception to "nothing listens on the agent"; off by default in
+  Docker. With the page on, fatal errors (bad token, revoked credentials) keep
+  the process up and show the error instead of exiting into a restart loop.
 
 ## Misc
 - Timestamps display as UTC ISO throughout (ops tool; local-time ambiguity is worse).

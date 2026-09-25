@@ -1,0 +1,24 @@
+<!--
+  WinSW 2.x config for the CertPortal agent service. The MSI registers the
+  service itself (ServiceInstall in certportal-agent.wxs) with this id; WinSW
+  runs certportal-agent.exe and stops it with Ctrl+C.
+-->
+<service>
+  <id>CertPortalAgent</id>
+  <name>CertPortal Agent</name>
+  <description>Outbound-only connector that lets CertPortal manage firewalls on this network.</description>
+  <executable>%BASE%\certportal-agent.exe</executable>
+
+  <!-- trust the Windows certificate store (corporate CAs, TLS-inspecting proxies) -->
+  <env name="NODE_USE_SYSTEM_CA" value="1"/>
+  <!-- honour HTTPS_PROXY / NO_PROXY if set machine-wide -->
+  <env name="NODE_USE_ENV_PROXY" value="1"/>
+
+  <logpath>%ProgramData%\CertPortal\Agent\logs</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>5</keepFiles>
+  </log>
+
+  <stoptimeout>10 sec</stoptimeout>
+</service>
