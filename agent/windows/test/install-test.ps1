@@ -10,6 +10,7 @@ $Msi = (Resolve-Path $Msi).Path
 $Url = 'http://127.0.0.1:8787'
 $DataDir = Join-Path $env:ProgramData 'CertPortal\Agent'
 $InstallDir = Join-Path $env:ProgramFiles 'CertPortal\Agent'
+$Shortcut = Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs\CertPortal Agent Status.url'
 $Logs = (Get-Location).Path   # msiexec logs land here
 
 function DumpLogs {
@@ -64,6 +65,13 @@ try {
   if (-not (Test-Path "$DataDir\agent.json")) { Fail 'agent.json missing' }
   Pass 'config written, token removed after enrollment'
 
+  $st = Invoke-RestMethod 'http://127.0.0.1:47801/status.json'
+  if (-not $st.connected -or $st.agentId -ne 'agent-1' -or $st.agentName -ne 'ci agent') { Fail "status page: $($st | ConvertTo-Json -Compress)" }
+  $html = (Invoke-WebRequest 'http://127.0.0.1:47801/' -UseBasicParsing).Content
+  if ($html -notmatch 'Connected') { Fail 'status page does not say Connected' }
+  if (-not (Test-Path $Shortcut)) { Fail "Start menu shortcut missing: $Shortcut" }
+  Pass 'status page reports connected; Start menu shortcut installed'
+
   $acl = Get-Acl $DataDir
   if (-not $acl.AreAccessRulesProtected) { Fail 'data folder still inherits permissions' }
   $who = $acl.Access | ForEach-Object { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } | Sort-Object -Unique
@@ -84,6 +92,7 @@ try {
   if (Get-Service CertPortalAgent -ErrorAction SilentlyContinue) { Fail 'service still registered' }
   if (Test-Path $InstallDir) { Fail "$InstallDir still exists" }
   if (Test-Path $DataDir) { Fail "$DataDir still exists" }
+  if (Test-Path $Shortcut) { Fail 'Start menu shortcut still exists' }
   Pass 'uninstalled cleanly'
 }
 catch { DumpLogs; throw }

@@ -12,6 +12,8 @@
   Installs certportal-agent.exe + the WinSW wrapper to Program Files, registers
   the CertPortalAgent service (LocalService, auto start, restart on failure),
   writes the config to %ProgramData%\CertPortal\Agent and starts the service.
+  A "CertPortal Agent Status" Start menu shortcut opens the agent's local
+  status page (http://127.0.0.1:47801/).
   Uninstall removes that folder too (credentials, logs); upgrades keep it.
 -->
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
@@ -51,12 +53,18 @@
           </Directory>
         </Directory>
       </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Component Id="StatusShortcut" Guid="*" Win64="yes">
+          <File Id="StatusShortcut" Source="$(var.DistDir)/certportal-agent-status.url" Name="CertPortal Agent Status.url" KeyPath="yes" />
+        </Component>
+      </Directory>
     </Directory>
 
     <Feature Id="Main" Level="1">
       <ComponentRef Id="AgentExe" />
       <ComponentRef Id="ServiceXml" />
       <ComponentRef Id="ServiceExe" />
+      <ComponentRef Id="StatusShortcut" />
     </Feature>
 
     <!-- all run as SYSTEM from the installed exe -->

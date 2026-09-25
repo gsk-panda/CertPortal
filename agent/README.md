@@ -54,7 +54,13 @@ SCCM). The MSI:
 - trusts the Windows certificate store (corporate CAs, TLS-inspecting proxies)
   and honours a machine-wide `HTTPS_PROXY`
 
-Logs are in `C:\ProgramData\CertPortal\Agent\logs`. Installing a newer MSI
+To check on it, open **CertPortal Agent Status** from the Start menu. It
+shows whether the agent is connected to the portal, when it last checked in,
+the jobs it has run and the last error, and refreshes every 5 seconds. The page
+is served by the agent on `http://127.0.0.1:47801/` (this machine only; set
+`AGENT_STATUS_PORT` in `config.json` to change it or `off` to disable), and
+`certportal-agent status` prints the same thing as JSON. Logs are in
+`C:\ProgramData\CertPortal\Agent\logs`. Installing a newer MSI
 upgrades in place and keeps the enrollment; passing a new `ENROLL_TOKEN`
 re-enrolls. Uninstalling (Apps & features, or `msiexec /x`) removes the service
 and the ProgramData folder, credentials included; delete the agent in the
@@ -94,13 +100,16 @@ page, set **Connection → Via agent: datacenter-1**.
 | `ENROLL_TOKEN` | One-time enrollment token (first run only) |
 | `AGENT_NAME` | Informational label |
 | `AGENT_STATE_FILE` | Credential store (default `/data/agent.json`, Windows `%ProgramData%\CertPortal\Agent\agent.json`) |
+| `AGENT_STATUS_PORT` | Local status page on `127.0.0.1` (default `47801` on Windows, off elsewhere; `off` disables) |
 | `AGENT_CONFIG_FILE` | Optional JSON file with any of these keys; env wins (default `config.json` next to the state file) |
 | `CONTROL_PLANE_INSECURE` | `true` to accept a self-signed control-plane cert |
 | `FIREWALL_CA_BUNDLE` | PEM to authenticate firewall mgmt certs when verify-TLS is on |
 
 ## Security
 
-- Outbound-only; nothing listens on the agent.
+- Outbound-only. The only listener is the read-only status page, bound to
+  `127.0.0.1` (on by default on Windows only); it shows no secrets and rejects
+  requests for other host names.
 - Credentials are stored `0600` in the state volume (on Windows, in a folder
   only SYSTEM, Administrators and the service account can read).
 - Firewall API keys and certificate material are sent to the agent per-job over

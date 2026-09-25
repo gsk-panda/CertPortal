@@ -211,6 +211,12 @@ production multi-tenant deployment; all are overridable where noted.
   `certportal-agent configure` (runs as SYSTEM, sets the folder ACL and owner);
   runs as `LocalService`; uninstall purges the folder, upgrades keep it. The
   exe embeds Node 24 (Node 20 is EOL) and trusts the Windows cert store.
+- **Agent status page**: on Windows the agent serves a read-only status page on
+  `127.0.0.1:47801` (Start menu shortcut) so an admin can see it is connected.
+  Loopback only, GET only, Host-checked against DNS rebinding, no secrets. It's
+  the one exception to "nothing listens on the agent"; off by default in
+  Docker. With the page on, fatal errors (bad token, revoked credentials) keep
+  the process up and show the error instead of exiting into a restart loop.
 
 ## Misc
 - Timestamps display as UTC ISO throughout (ops tool; local-time ambiguity is worse).

@@ -16,6 +16,8 @@
  *   AGENT_CONFIG_FILE   JSON file holding any of these keys (default <data dir>/config.json)
  *   CONTROL_PLANE_INSECURE  "true" to skip TLS verify to the control plane (self-signed)
  *   FIREWALL_CA_BUNDLE  PEM to authenticate firewall mgmt certs (verify_tls)
+ *   AGENT_STATUS_PORT   local status page on 127.0.0.1 (default 47801 on Windows,
+ *                       off elsewhere; "off" disables)
  *
  * The data dir is /data (docker volume) or %ProgramData%\CertPortal\Agent on
  * Windows, where the MSI writes config.json via `certportal-agent configure`.
@@ -26,6 +28,7 @@
  *               config file and lock its folder down (Windows installer uses this)
  *   purge       delete the data dir (Windows uninstaller uses this)
  *   set-recovery  make the Windows service restart after failures (installer)
+ *   status      print the running agent's status (from its status page)
  *   --version   print the version
  */
 
@@ -41,7 +44,7 @@ const DATA_DIR = IS_WINDOWS
   : '/data';
 const CONFIG_FILE = process.env.AGENT_CONFIG_FILE || path.join(DATA_DIR, 'config.json');
 const CONFIG_KEYS = ['CONTROL_PLANE_URL', 'ENROLL_TOKEN', 'AGENT_NAME', 'AGENT_STATE_FILE',
-  'CONTROL_PLANE_INSECURE', 'FIREWALL_CA_BUNDLE'];
+  'CONTROL_PLANE_INSECURE', 'FIREWALL_CA_BUNDLE', 'AGENT_STATUS_PORT'];
 
 function readJson(file) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
@@ -129,6 +132,24 @@ function forgetEnrollToken() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+function statusPort() {
+  const v = String(process.env.AGENT_STATUS_PORT ?? (IS_WINDOWS ? '47801' : 'off')).toLowerCase();
+  const port = parseInt(v, 10);
+  return v === 'off' || !(port > 0) ? null : port;
+}
+
+async function printStatus() {
+  loadConfig();
+  const port = statusPort() || 47801;
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/status.json`);
+    console.log(JSON.stringify(await res.json(), null, 2));
+  } catch (err) {
+    console.error(`agent not reachable on 127.0.0.1:${port} (${err.message}) — is the service running?`);
+    process.exit(1);
+  }
+}
+
 function agent() {
   loadConfig();
   const CONTROL_PLANE = (process.env.CONTROL_PLANE_URL || '').replace(/\/+$/, '');
@@ -136,6 +157,20 @@ function agent() {
   if (!CONTROL_PLANE) { console.error(`CONTROL_PLANE_URL is required (env or ${CONFIG_FILE})`); process.exit(1); }
 
   const { executeOp } = require('../src/services/panos/ops');
+  const { createStatus, startStatusServer } = require('./status');
+  const status = createStatus({ version: VERSION, controlPlane: CONTROL_PLANE, agentName: process.env.AGENT_NAME || null });
+  const port = statusPort();
+  if (port) startStatusServer(status, port);
+
+  // With a status page, stay up on a fatal error so the page can say what went
+  // wrong (and the service doesn't restart-loop on a bad token); otherwise exit.
+  function fatal(message) {
+    console.error(`[agent] ${message}`);
+    if (!port) process.exit(1);
+    status.set({ phase: 'stopped' });
+    status.error(message);
+    setInterval(() => {}, 1 << 30);
+  }
 
   // allow self-signed control-plane TLS when explicitly opted in
   if (String(process.env.CONTROL_PLANE_INSECURE).toLowerCase() === 'true') {
@@ -165,6 +200,7 @@ function agent() {
   async function enroll() {
     const token = process.env.ENROLL_TOKEN;
     if (!token) throw new Error('no saved credentials and ENROLL_TOKEN not set');
+    status.set({ phase: 'enrolling' });
     let backoff = 1000;
     for (;;) {
       let res;
@@ -172,6 +208,7 @@ function agent() {
         res = await api('/api/agent/enroll', { method: 'POST', body: { token, version: VERSION } });
       } catch (err) {
         console.error(`[agent] enrollment: ${err.message}; retrying in ${Math.round(backoff / 1000)}s`);
+        status.error(`can't reach CertPortal: ${err.cause?.message || err.message}`);
       }
       if (res && res.ok) {
         const creds = await res.json(); // { agentId, agentSecret }
@@ -181,8 +218,14 @@ function agent() {
         console.log(`[agent] enrolled as ${creds.agentId}`);
         return creds;
       }
-      if (res && res.status < 500) throw new Error(`enrollment failed: HTTP ${res.status} ${await res.text()}`);
-      if (res) console.error(`[agent] enrollment: HTTP ${res.status}; retrying in ${Math.round(backoff / 1000)}s`);
+      if (res && res.status < 500) {
+        throw new Error(`CertPortal rejected the enrollment token (HTTP ${res.status} ${await res.text()}). `
+          + 'It may already be used; add a new agent in the portal and reinstall with its token.');
+      }
+      if (res) {
+        console.error(`[agent] enrollment: HTTP ${res.status}; retrying in ${Math.round(backoff / 1000)}s`);
+        status.error(`enrollment: CertPortal returned HTTP ${res.status}`);
+      }
       await sleep(backoff);
       backoff = Math.min(backoff * 2, 30000);
     }
@@ -197,9 +240,10 @@ function agent() {
       if (err.name === 'AbortError') return; // poll window elapsed; loop again
       throw err;
     }
-    if (res.status === 204) return;                // idle
     if (res.status === 401) throw Object.assign(new Error('unauthorized'), { reauth: true });
-    if (!res.ok) throw new Error(`poll failed: HTTP ${res.status}`);
+    if (!res.ok && res.status !== 204) throw new Error(`poll failed: HTTP ${res.status}`);
+    status.contact();
+    if (res.status === 204) return;                // idle
 
     const { job } = await res.json();
     console.log(`[agent] job ${job.id} op=${job.op}`);
@@ -211,6 +255,7 @@ function agent() {
       outcome = { status: 'failed', error: err.message };
       console.warn(`[agent] job ${job.id} failed: ${err.message}`);
     }
+    status.job(job, outcome);
     await api(`/api/agent/jobs/${job.id}/result`, { method: 'POST', auth: bearer, body: outcome });
   }
 
@@ -218,6 +263,7 @@ function agent() {
     let creds = readJson(STATE_FILE);
     if (!creds) creds = await enroll();
     const bearer = `${creds.agentId}.${creds.agentSecret}`;
+    status.set({ phase: 'running', agentId: creds.agentId });
     console.log(`[agent] CertPortal agent ${VERSION} → ${CONTROL_PLANE} (agent ${creds.agentId})`);
 
     let backoff = 1000;
@@ -226,15 +272,16 @@ function agent() {
         await runOnce(bearer);
         backoff = 1000; // reset on success
       } catch (err) {
-        if (err.reauth) { console.error('[agent] credentials rejected — re-enroll required'); process.exit(1); }
+        if (err.reauth) return fatal('CertPortal rejected this agent\'s credentials (was it deleted in the portal?). Reinstall with a new enrollment token.');
         console.error(`[agent] ${err.message}; retrying in ${Math.round(backoff / 1000)}s`);
+        status.error(err.cause?.message ? `can't reach CertPortal: ${err.cause.message}` : err.message);
         await sleep(backoff);
         backoff = Math.min(backoff * 2, 30000);
       }
     }
   }
 
-  main().catch((err) => { console.error('[agent] fatal:', err.message); process.exit(1); });
+  main().catch((err) => fatal(err.message));
 }
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -242,4 +289,5 @@ if (cmd === '--version' || cmd === 'version') console.log(VERSION);
 else if (cmd === 'configure') configure(rest);
 else if (cmd === 'purge') purge();
 else if (cmd === 'set-recovery') setRecovery();
+else if (cmd === 'status') printStatus();
 else agent();

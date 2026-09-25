@@ -116,6 +116,8 @@ async function main() {
   if (sha256(winsw) !== WINSW_SHA256) throw new Error('WinSW checksum mismatch');
   fs.writeFileSync(path.join(DIST, 'certportal-agent-service.exe'), winsw);
   fs.copyFileSync(path.join(__dirname, 'certportal-agent-service.xml'), path.join(DIST, 'certportal-agent-service.xml'));
+  // Start menu shortcut to the agent's local status page
+  fs.writeFileSync(path.join(DIST, 'certportal-agent-status.url'), '[InternetShortcut]\r\nURL=http://127.0.0.1:47801/\r\n');
 
   console.log(`built certportal-agent.exe ${VERSION} (Node ${process.version})`);
 
