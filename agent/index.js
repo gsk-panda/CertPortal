@@ -57,16 +57,21 @@ function writeJson(file, data) {
 // On Windows the 0600 file mode is ignored, so the data folder's ACL is what
 // protects the agent secret: SYSTEM + Administrators full, LocalService (the
 // service account) modify, nothing inherited. SIDs avoid localized names.
-function lockDownDataDir(dir, createdNow) {
-  if (!IS_WINDOWS) return;
-  // Take ownership first: ProgramData lets any user pre-create this folder.
-  // If we just created it ourselves (as SYSTEM) nobody else can own it, so a
-  // failure here is only fatal for a folder that already existed.
-  try {
-    run('icacls', [dir, '/setowner', '*S-1-5-32-544', '/T', '/C', '/Q']);
-  } catch (err) {
-    if (!createdNow) throw err;
-    installerLog(`warning: ${err.message}`);
+function lockDownDataDir(dir) {
+  if (!IS_WINDOWS) return fs.mkdirSync(dir, { recursive: true });
+  // ProgramData lets any user pre-create this folder, and a failed install
+  // leaves ours behind, so take ownership of one that exists. If that fails
+  // the folder can't be trusted: start it afresh (as SYSTEM, so we own it).
+  if (fs.existsSync(dir)) {
+    try {
+      run('icacls', [dir, '/setowner', '*S-1-5-32-544', '/T', '/C', '/Q']);
+    } catch (err) {
+      fs.rmSync(dir, { recursive: true, force: true });
+      fs.mkdirSync(dir, { recursive: true });
+      installerLog(`recreated ${dir}: could not take ownership of the old one (${err.message})`);
+    }
+  } else {
+    fs.mkdirSync(dir, { recursive: true });
   }
   run('icacls', [dir, '/inheritance:r', '/grant:r',
     '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-544:(OI)(CI)F', '*S-1-5-19:(OI)(CI)M', '/T', '/C', '/Q']);
@@ -74,15 +79,18 @@ function lockDownDataDir(dir, createdNow) {
 
 // The installer runs these commands with no console, where writing to stdout
 // can itself fail, so they report to a log file instead and never inherit stdio.
-// Only configure creates the data folder, so it can tell whether the folder
-// existed before it (see lockDownDataDir); the other commands log only if it's there.
+// Only configure creates the data folder; the other commands log only if it's there.
 function installerLog(message, { create = true } = {}) {
+  const line = `${new Date().toISOString()} ${message}\n`;
   try {
     if (!create && !fs.existsSync(DATA_DIR)) return;
     const dir = path.join(DATA_DIR, 'logs');
     fs.mkdirSync(dir, { recursive: true });
-    fs.appendFileSync(path.join(dir, 'installer.log'), `${new Date().toISOString()} ${message}\n`);
-  } catch { /* nowhere left to report */ }
+    fs.appendFileSync(path.join(dir, 'installer.log'), line);
+  } catch {
+    // e.g. the data folder is unusable: fall back to SYSTEM's temp folder
+    try { fs.appendFileSync(path.join(require('os').tmpdir(), 'certportal-agent-installer.log'), line); } catch { /* nowhere left */ }
+  }
 }
 
 function run(cmd, args) {
@@ -126,10 +134,7 @@ function configure(argv) {
   if (args.name) current.AGENT_NAME = args.name;
   if (args.insecure) current.CONTROL_PLANE_INSECURE = 'true';
   if (!current.CONTROL_PLANE_URL) throw new Error('--url is required');
-  const dir = path.dirname(CONFIG_FILE);
-  const createdNow = !fs.existsSync(dir);
-  fs.mkdirSync(dir, { recursive: true });
-  lockDownDataDir(dir, createdNow);
+  lockDownDataDir(path.dirname(CONFIG_FILE));
   writeJson(CONFIG_FILE, current);
 }
 

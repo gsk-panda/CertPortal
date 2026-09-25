@@ -1,6 +1,6 @@
 {
   "name": "certportal-agent",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "private": true,
   "description": "CertPortal on-prem agent \u2014 outbound-only connector to firewalls/Panorama",
   "main": "index.js",
