@@ -1,6 +1,7 @@
 # End-to-end test of certportal-agent.msi on a Windows host (run elevated).
 # Starts the mock control plane, installs the MSI, checks the service enrolls,
-# polls, locks down its data, restarts after a crash, and uninstalls cleanly.
+# polls, locks down its data (also when a failed install left the folder
+# behind), restarts after a crash, and uninstalls cleanly.
 #
 #   pwsh agent/windows/test/install-test.ps1 -Msi agent/windows/dist/certportal-agent.msi
 
@@ -41,7 +42,10 @@ try {
   if (Get-Service CertPortalAgent -ErrorAction SilentlyContinue) { Fail 'service exists after refused install' }
   Pass 'install without a token is refused'
 
-  # 2. install
+  # 2. install over a data folder left behind by an earlier failed install
+  #    (a rollback doesn't remove it, since the MSI doesn't own it)
+  New-Item -ItemType Directory -Force "$DataDir\logs" | Out-Null
+  Set-Content "$DataDir\logs\installer.log" 'left over from an earlier install'
   $code = Msiexec @('/i', "`"$Msi`"", "CONTROL_PLANE_URL=$Url", 'ENROLL_TOKEN=test-token', 'AGENT_NAME="ci agent"', '/qn', '/l*v', "`"$Logs\install.log`"")
   if ($code -ne 0) { Fail "install exited $code" }
   if (Select-String -Path "$Logs\install.log" -Pattern 'test-token' -Quiet) { Fail 'enrollment token appears in the install log' }
