@@ -1,0 +1,99 @@
+<%- include('../partials/head', { title }) %>
+<div class="page-head">
+  <div>
+    <h1 class="mono" style="font-size:1.3rem"><%= (cert.san_list || []).join(', ') %></h1>
+    <p class="sub">Domain <a href="/domains/<%= domain.id %>"><%= domain.fqdn %></a> · <%= cert.key_type === 'rsa_2048' ? 'RSA-2048' : 'ECDSA P-256' %></p>
+  </div>
+  <span class="badge <%= cert.status === 'deployed' ? 'green' : cert.status === 'failed' ? 'red' : cert.status === 'renewing' || cert.status === 'pending' ? 'yellow' : 'blue' %>" style="font-size:.95rem" id="cert-status"><%= cert.status %></span>
+</div>
+
+<% if (cert.status === 'pending' || cert.status === 'renewing') { %>
+  <div class="banner-warn" id="progress-banner" data-cert-id="<%= cert.id %>">Issuance in progress — this page refreshes automatically.</div>
+<% } %>
+
+<% if (cert.pending_challenges && cert.pending_challenges.length && !cert.manual_confirmed_at) { %>
+<div class="panel">
+  <h3 style="margin-top:0">Action required — create these TXT records</h3>
+  <p style="font-size:.9rem">This certificate uses a <strong>manual</strong> DNS provider. Create the records below, then confirm.
+  CertPortal will watch the authoritative nameservers and continue automatically.</p>
+  <% cert.pending_challenges.forEach(ch => { %>
+    <div class="record-box" data-copy><%= ch.name %>.  IN  TXT  "<%= ch.value %>"</div>
+  <% }) %>
+  <form class="inline" method="post" action="/certificates/<%= cert.id %>/confirm-dns">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <button class="btn primary" type="submit">I created the records — continue</button>
+  </form>
+</div>
+<% } %>
+
+<% if (cert.last_error) { %>
+  <div class="flash error"><strong>Last error:</strong> <%= cert.last_error %><% if (cert.renewal_failures) { %> (<%= cert.renewal_failures %> consecutive failure<%= cert.renewal_failures > 1 ? 's' : '' %>)<% } %></div>
+<% } %>
+
+<div class="panel">
+  <dl class="kv">
+    <dt>Serial</dt><dd class="mono"><%= cert.serial || '—' %></dd>
+    <dt>Valid from</dt><dd><%= cert.not_before ? new Date(cert.not_before).toISOString().replace('T',' ').slice(0,19) + ' UTC' : '—' %></dd>
+    <dt>Expires</dt><dd><%= cert.not_after ? new Date(cert.not_after).toISOString().replace('T',' ').slice(0,19) + ' UTC' : '—' %></dd>
+    <dt>Auto-renew</dt><dd><%= cert.auto_renew ? 'on — at ' + currentOrg.renewal_percent + '% of lifetime' : 'off' %></dd>
+    <dt>Last attempt</dt><dd><%= cert.last_renewal_attempt ? new Date(cert.last_renewal_attempt).toISOString().replace('T',' ').slice(0,19) + ' UTC' : '—' %></dd>
+  </dl>
+  <div class="actions" style="margin-top:1rem">
+    <form class="inline" method="post" action="/certificates/<%= cert.id %>/renew">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button class="btn" type="submit">Renew now</button>
+    </form>
+    <form class="inline" method="post" action="/certificates/<%= cert.id %>/redeploy">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button class="btn" type="submit">Redeploy</button>
+    </form>
+    <% if (cert.cert_pem) { %>
+      <a class="btn small" href="/certificates/<%= cert.id %>/download/cert">cert.pem</a>
+      <a class="btn small" href="/certificates/<%= cert.id %>/download/chain">chain.pem</a>
+      <a class="btn small" href="/certificates/<%= cert.id %>/download/fullchain">fullchain.pem</a>
+    <% } %>
+    <form class="inline" method="post" action="/certificates/<%= cert.id %>/delete" data-confirm="Delete this certificate and its deployment links?">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button class="btn small danger" type="submit">Delete</button>
+    </form>
+  </div>
+</div>
+
+<h2>Deployments</h2>
+<table>
+  <thead><tr><th>Firewall</th><th>PAN-OS object</th><th>Profile / GP bindings</th><th>Status</th><th>Commit job</th><th>Validation</th><th>Deployed</th><th></th></tr></thead>
+  <tbody>
+  <% deployments.forEach(d => { %>
+    <tr>
+      <td><strong><%= d.fw_name %></strong><div class="dim mono"><%= d.mgmt_address %></div></td>
+      <td class="mono"><%= d.panos_cert_name %></td>
+      <td class="dim"><%= [d.ssl_tls_profile, d.gp_portal ? 'portal:' + d.gp_portal : null, d.gp_gateway ? 'gw:' + d.gp_gateway : null].filter(Boolean).join(', ') || '—' %></td>
+      <td><span class="badge <%= d.status === 'deployed' ? 'green' : d.status === 'failed' ? 'red' : 'yellow' %>"><%= d.status %></span>
+        <% if (d.last_error) { %><div class="dim" style="max-width:260px"><%= d.last_error %></div><% } %></td>
+      <td class="dim mono"><%= d.commit_job_id || '—' %></td>
+      <td><% if (d.validation_ok === true) { %><span class="badge green">serial match</span><% } else if (d.validation_ok === false) { %><span class="badge red">failed</span><% } else { %><span class="badge gray">n/a</span><% } %></td>
+      <td class="dim"><%= d.deployed_at ? new Date(d.deployed_at).toISOString().slice(0,16).replace('T',' ') : '—' %></td>
+      <td>
+        <form class="inline" method="post" action="/certificates/<%= cert.id %>/deployments/<%= d.id %>/run">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button class="btn small" type="submit">Run</button>
+        </form>
+      </td>
+    </tr>
+  <% }) %>
+  <% if (!deployments.length) { %><tr><td colspan="8" class="empty">Not linked to any firewalls.</td></tr><% } %>
+  </tbody>
+</table>
+
+<h2>Timeline</h2>
+<ul class="timeline">
+  <% timeline.forEach(t => { %>
+    <li>
+      <strong><%= t.action %></strong>
+      <span class="when"> — <%= new Date(t.created_at).toISOString().replace('T',' ').slice(0,19) %> UTC</span>
+      <% if (t.detail) { %><div class="dim mono" style="font-size:.8rem"><%= JSON.stringify(t.detail).slice(0, 220) %></div><% } %>
+    </li>
+  <% }) %>
+  <% if (!timeline.length) { %><li class="empty">No events yet.</li><% } %>
+</ul>
+<%- include('../partials/tail') %>

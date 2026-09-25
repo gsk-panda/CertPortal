@@ -1,0 +1,27 @@
+# Overlay for AWS single-instance deployment:
+#   docker compose -f docker-compose.yml -f deploy/aws/docker-compose.aws.yml up -d --build
+# Adds a Caddy TLS terminator for the portal itself and exposes the
+# CNAME-delegation DNS responder on host udp/53.
+services:
+  app:
+    restart: unless-stopped
+    ports:
+      - "53:5353/udp"   # built-in authoritative DNS for ACME_DNS_ZONE
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/aws/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  caddy_data:
+  caddy_config:

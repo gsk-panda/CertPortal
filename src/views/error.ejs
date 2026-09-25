@@ -1,0 +1,14 @@
+<% if (typeof user !== 'undefined' && user) { %>
+  <%- include('partials/head', { title }) %>
+  <h1><%= title %></h1>
+  <p><%= message %></p>
+  <p><a href="/">← Back home</a></p>
+  <%- include('partials/tail') %>
+<% } else { %>
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title><%= title %> · CertPortal</title>
+<link rel="stylesheet" href="/static/css/app.css"></head>
+<body><div class="auth-wrap"><div class="auth-card">
+  <h1><%= title %></h1><p><%= message %></p><p><a href="/login">← Sign in</a></p>
+</div></div></body></html>
+<% } %>

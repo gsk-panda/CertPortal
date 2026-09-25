@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Start free trial · CertPortal</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="brand">CertPortal<span class="dot">●</span></div>
+    <h1>Start your free trial</h1>
+    <% if (flash) { %><div class="flash <%= flash.type %>"><%= flash.message %></div><% } %>
+    <p style="font-size:.9rem;color:var(--text-dim)">Automated SSL/TLS certificate management for your Palo Alto
+    firewalls. <%= trialDays %>-day free trial, no card required.</p>
+    <form method="post" action="/signup" class="stack" data-match-password>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label class="field">Organization name
+        <input type="text" name="org_name" required autofocus maxlength="120">
+      </label>
+      <label class="field">Work email
+        <input type="email" name="email" required autocomplete="username">
+      </label>
+      <label class="field">Password (12+ characters)
+        <input type="password" name="password" minlength="12" required autocomplete="new-password">
+      </label>
+      <label class="field">Confirm password
+        <input type="password" name="password_confirm" minlength="12" required autocomplete="new-password">
+      </label>
+      <button class="btn primary" type="submit">Create account</button>
+    </form>
+    <p style="margin-top:1rem;font-size:.85rem">Already have an account? <a href="/login">Sign in</a></p>
+  </div>
+</div>
+</body>
+</html>

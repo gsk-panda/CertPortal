@@ -1,0 +1,74 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: certportal
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-certportal}
+      POSTGRES_DB: certportal
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U certportal"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: "3000"
+      BASE_URL: ${BASE_URL:-http://localhost:3000}
+      DATABASE_URL: postgres://certportal:${POSTGRES_PASSWORD:-certportal}@db:5432/certportal
+      MASTER_KEK: ${MASTER_KEK:?set MASTER_KEK (32 bytes base64)}
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ChangeMe123!}
+      ACME_DIRECTORY: ${ACME_DIRECTORY:-staging}
+      ACME_INSECURE: ${ACME_INSECURE:-false}
+      ACME_DNS_ZONE: ${ACME_DNS_ZONE:-acme.certportal.example}
+      ACME_DNS_PUBLIC_IP: ${ACME_DNS_PUBLIC_IP:-192.0.2.1}
+      ACME_DNS_PORT: ${ACME_DNS_PORT:-0}
+      MOCK_PANOS: ${MOCK_PANOS:-false}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-certportal@example.com}
+    ports:
+      - "3000:3000"
+      # built-in authoritative DNS responder for CNAME delegation (enable via ACME_DNS_PORT=5353)
+      # - "53:5353/udp"
+    restart: unless-stopped
+
+  # ---- test profile: local ACME server (Pebble) + DNS test server -------------
+  pebble:
+    profiles: ["test"]
+    image: ghcr.io/letsencrypt/pebble:latest
+    command: ["-config", "/test/pebble-config.json", "-dnsserver", "challtestsrv:8053", "-strict", "false"]
+    environment:
+      PEBBLE_VA_NOSLEEP: "1"
+    volumes:
+      - ./test:/test:ro
+    ports:
+      - "127.0.0.1:14000:14000"   # ACME directory
+      - "127.0.0.1:15000:15000"   # management
+    depends_on:
+      - challtestsrv
+
+  challtestsrv:
+    profiles: ["test"]
+    image: ghcr.io/letsencrypt/pebble-challtestsrv:latest
+    command: ["-dns01", ":8053", "-http01", "", "-https01", "", "-tlsalpn01", "", "-management", ":8055"]
+    ports:
+      - "127.0.0.1:8053:8053/udp"
+      - "127.0.0.1:8053:8053/tcp"
+      - "127.0.0.1:8055:8055"     # management API (set-txt)
+
+volumes:
+  pgdata:

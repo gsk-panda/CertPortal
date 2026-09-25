@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in · CertPortal</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="brand">CertPortal<span class="dot">●</span></div>
+    <h1>Sign in</h1>
+    <% if (flash) { %><div class="flash <%= flash.type %>"><%= flash.message %></div><% } %>
+    <form method="post" action="/login" class="stack">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="next" value="<%= next %>">
+      <label class="field">Email
+        <input type="email" name="email" required autofocus autocomplete="username">
+      </label>
+      <label class="field">Password
+        <input type="password" name="password" required autocomplete="current-password">
+      </label>
+      <button class="btn primary" type="submit">Sign in</button>
+    </form>
+    <p style="margin-top:1rem;font-size:.85rem"><a href="/password-reset">Forgot your password?</a></p>
+    <% if (typeof signupEnabled !== 'undefined' && signupEnabled) { %>
+      <p style="font-size:.85rem">New here? <a href="/signup">Start a free trial</a></p>
+    <% } %>
+    <div class="env-tag">Automated certificate lifecycle for PAN-OS firewalls</div>
+  </div>
+</div>
+</body>
+</html>

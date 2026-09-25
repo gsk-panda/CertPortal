@@ -1,0 +1,30 @@
+<%- include('../partials/head', { title }) %>
+<div class="page-head">
+  <div><h1>DNS providers</h1><p class="sub">Where CertPortal publishes DNS-01 validation records.</p></div>
+  <a class="btn primary" href="/dns-providers/new">Add provider</a>
+</div>
+<table>
+  <thead><tr><th>Label</th><th>Type</th><th>Domains</th><th>Added</th><th></th></tr></thead>
+  <tbody>
+  <% providers.forEach(p => { %>
+    <tr>
+      <td><strong><%= p.label %></strong></td>
+      <td><span class="badge blue"><%= types[p.type] ? types[p.type].label : p.type %></span></td>
+      <td><%= p.domain_count %></td>
+      <td class="dim"><%= new Date(p.created_at).toISOString().slice(0,10) %></td>
+      <td class="actions">
+        <form class="inline" method="post" action="/dns-providers/<%= p.id %>/test">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button class="btn small" type="submit">Test</button>
+        </form>
+        <form class="inline" method="post" action="/dns-providers/<%= p.id %>/delete" data-confirm="Delete provider <%= p.label %>?">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button class="btn small danger" type="submit">Delete</button>
+        </form>
+      </td>
+    </tr>
+  <% }) %>
+  <% if (!providers.length) { %><tr><td colspan="5" class="empty">No DNS providers yet.</td></tr><% } %>
+  </tbody>
+</table>
+<%- include('../partials/tail') %>

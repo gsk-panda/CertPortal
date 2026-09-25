@@ -1,0 +1,21 @@
+<%- include('../partials/head', { title }) %>
+<h1>Add domain</h1>
+<% if (!providers.length) { %>
+  <div class="banner-warn">You need a <a href="/dns-providers/new">DNS provider</a> first — it determines how validation records are published.</div>
+<% } %>
+<form method="post" action="/domains" class="stack">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <label class="field">Fully-qualified domain name
+    <input type="text" name="fqdn" required placeholder="vpn.example.com">
+  </label>
+  <label class="field">DNS provider for validation records
+    <select name="dns_provider_id" required>
+      <% providers.forEach(p => { %><option value="<%= p.id %>"><%= p.label %> (<%= p.type %>)</option><% }) %>
+    </select>
+  </label>
+  <div class="actions">
+    <button class="btn primary" type="submit" <%= providers.length ? '' : 'disabled' %>>Add domain</button>
+    <a class="btn" href="/domains">Cancel</a>
+  </div>
+</form>
+<%- include('../partials/tail') %>

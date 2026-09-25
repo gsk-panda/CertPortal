@@ -1,0 +1,82 @@
+# CertPortal — internal (on-prem) single-host deployment.
+#
+#   cd deploy/internal
+#   cp .env.internal.example .env   # then fill in secrets
+#   docker compose up -d --build
+#
+# Security posture:
+#   * No inbound from the internet. Only Caddy's 80/443 are published, for
+#     internal users on the LAN.
+#   * The firewall management API is reached over the LAN (outbound from this
+#     host) — never exposed to the internet, no API key ever leaves the premises.
+#   * Outbound the host needs: 443 to Let's Encrypt + your DNS provider API,
+#     and 53 for DNS lookups. Nothing else.
+#   * Portal served over HTTPS with Caddy's internal CA (self-signed).
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: certportal
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: certportal
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U certportal"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: "3000"
+      BASE_URL: ${BASE_URL:?set BASE_URL, e.g. https://certportal.corp.example}
+      DATABASE_URL: postgres://certportal:${POSTGRES_PASSWORD}@db:5432/certportal
+      MASTER_KEK: ${MASTER_KEK:?set MASTER_KEK (32 bytes base64)}
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ChangeMe123!}
+      ACME_DIRECTORY: ${ACME_DIRECTORY:-staging}
+      COOKIE_SECURE: "true"
+      # No CNAME-delegation responder on-prem (using a DNS provider API) => no inbound 53
+      ACME_DNS_PORT: "0"
+      # Optional: authenticate the firewall mgmt cert (recommended). Mount the
+      # PEM under ./ca and point at it here.
+      FIREWALL_CA_BUNDLE: ${FIREWALL_CA_BUNDLE:-}
+      # Optional internal SMTP relay for notifications / password resets
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-25}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-certportal@corp.example}
+    volumes:
+      - ./ca:/ca:ro          # optional firewall mgmt CA / cert bundle
+    # app is NOT published to the host — only Caddy can reach it
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      PORTAL_HOSTNAME: ${PORTAL_HOSTNAME:?set PORTAL_HOSTNAME, e.g. certportal.corp.example}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

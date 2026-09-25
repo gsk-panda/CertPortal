@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Two-factor · CertPortal</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-card">
+    <h1>Two-factor authentication</h1>
+    <% if (flash) { %><div class="flash <%= flash.type %>"><%= flash.message %></div><% } %>
+    <p style="font-size:.9rem;color:var(--text-dim)">Enter the 6-digit code from your authenticator app.</p>
+    <form method="post" action="/login/totp" class="stack">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label class="field">Code
+        <input type="text" name="code" inputmode="numeric" pattern="\d{6}" maxlength="6" required autofocus autocomplete="one-time-code">
+      </label>
+      <button class="btn primary" type="submit">Verify</button>
+    </form>
+  </div>
+</div>
+</body>
+</html>

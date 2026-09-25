@@ -1,0 +1,13 @@
+<%- include('../partials/head', { title }) %>
+<h1>Enable two-factor auth</h1>
+<div class="panel" style="max-width:480px">
+  <p style="font-size:.9rem">Scan this QR code with your authenticator app, or enter the secret manually, then confirm with a code.</p>
+  <img src="<%= qr %>" alt="TOTP QR code" width="200" height="200" style="border-radius:8px;background:#fff;padding:8px">
+  <div class="record-box" data-copy><%= secret %></div>
+  <form method="post" action="/account/totp/confirm" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label class="field">6-digit code <input type="text" name="code" inputmode="numeric" pattern="\d{6}" maxlength="6" required autofocus></label>
+    <button class="btn primary" type="submit">Confirm & enable</button>
+  </form>
+</div>
+<%- include('../partials/tail') %>

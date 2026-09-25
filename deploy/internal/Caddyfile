@@ -1,0 +1,8 @@
+# Internal portal TLS via Caddy's built-in local CA (self-signed).
+# Users reach https://{PORTAL_HOSTNAME}; distribute Caddy's root once (see
+# deploy/internal/README.md) so browsers show it as trusted, or click through.
+{$PORTAL_HOSTNAME} {
+	tls internal
+	encode gzip
+	reverse_proxy app:3000
+}

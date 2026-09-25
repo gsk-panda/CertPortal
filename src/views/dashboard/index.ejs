@@ -1,0 +1,56 @@
+<%- include('../partials/head', { title }) %>
+<div class="page-head">
+  <div>
+    <h1>Dashboard</h1>
+    <p class="sub"><%= currentOrg.name %> — certificate posture at a glance.</p>
+  </div>
+  <a class="btn primary" href="/certificates/new">New certificate</a>
+</div>
+
+<div class="statgrid">
+  <div class="stat"><div class="n"><%= counts.total %></div><div class="l">certificates</div></div>
+  <div class="stat green"><div class="n"><%= counts.green %></div><div class="l">healthy (15+ days)</div></div>
+  <div class="stat yellow"><div class="n"><%= counts.yellow %></div><div class="l">renewing window (&lt;15 days)</div></div>
+  <div class="stat red"><div class="n"><%= counts.red %></div><div class="l">critical (&lt;7 days)</div></div>
+  <div class="stat <%= counts.failed ? 'red' : '' %>"><div class="n"><%= counts.failed %></div><div class="l">failing renewal</div></div>
+</div>
+
+<% if (unverifiedDomains > 0) { %>
+  <div class="banner-warn"><%= unverifiedDomains %> domain(s) are not ownership-verified — issuance and renewals for them are paused. <a href="/domains">Review domains →</a></div>
+<% } %>
+
+<h2>Certificates</h2>
+<table>
+  <thead><tr><th>SANs</th><th>Status</th><th>Days left</th><th>Renews ~</th><th>Firewalls</th><th>Expires</th></tr></thead>
+  <tbody>
+  <% certs.forEach(c => {
+       const days = c.days_left === null ? null : Math.floor(c.days_left);
+       const cls = days === null ? 'gray' : (days < 7 ? 'red' : days < 15 ? 'yellow' : 'green');
+  %>
+    <tr>
+      <td><a href="/certificates/<%= c.id %>" class="mono"><%= (c.san_list || []).join(', ') %></a></td>
+      <td><span class="badge <%= c.status === 'deployed' ? 'green' : c.status === 'failed' ? 'red' : c.status === 'renewing' ? 'yellow' : 'blue' %>"><%= c.status %></span>
+        <% if (c.renewal_failures > 0) { %><span class="badge red"><%= c.renewal_failures %>× failed</span><% } %></td>
+      <td><% if (days !== null) { %><span class="badge <%= cls %>"><%= days %>d</span><% } else { %>—<% } %></td>
+      <td class="dim"><%= c.renew_at ? new Date(c.renew_at).toISOString().slice(0,10) : '—' %></td>
+      <td><%= c.fw_count %></td>
+      <td class="dim"><%= c.not_after ? new Date(c.not_after).toISOString().slice(0,16).replace('T',' ') : '—' %></td>
+    </tr>
+  <% }) %>
+  <% if (!certs.length) { %><tr><td colspan="6" class="empty">No certificates yet. <a href="/certificates/new">Create the first one</a>.</td></tr><% } %>
+  </tbody>
+</table>
+
+<% if (failures.length) { %>
+<h2>Recent failures</h2>
+<ul class="timeline">
+  <% failures.forEach(f => { %>
+    <li>
+      <strong><%= f.action %></strong>
+      <span class="when"> — <%= new Date(f.created_at).toISOString().replace('T',' ').slice(0,19) %></span>
+      <div class="dim mono"><%= f.detail && f.detail.error ? f.detail.error : '' %></div>
+    </li>
+  <% }) %>
+</ul>
+<% } %>
+<%- include('../partials/tail') %>

@@ -1,0 +1,25 @@
+<%- include('../partials/head', { title }) %>
+<div class="page-head">
+  <div><h1>Certificates</h1><p class="sub">Issued via Let's Encrypt (DNS-01), auto-renewed, auto-deployed.</p></div>
+  <a class="btn primary" href="/certificates/new">New certificate</a>
+</div>
+<table>
+  <thead><tr><th>SANs</th><th>Key</th><th>Status</th><th>Days left</th><th>Firewalls</th><th>Auto-renew</th><th>Created</th></tr></thead>
+  <tbody>
+  <% certs.forEach(c => {
+       const days = c.days_left === null ? null : Math.floor(c.days_left);
+  %>
+    <tr>
+      <td><a href="/certificates/<%= c.id %>" class="mono"><%= (c.san_list || []).join(', ') %></a></td>
+      <td class="dim"><%= c.key_type === 'rsa_2048' ? 'RSA-2048' : 'ECDSA P-256' %></td>
+      <td><span class="badge <%= c.status === 'deployed' ? 'green' : c.status === 'failed' ? 'red' : c.status === 'renewing' || c.status === 'pending' ? 'yellow' : 'blue' %>"><%= c.status %></span></td>
+      <td><% if (days !== null) { %><span class="badge <%= days < 7 ? 'red' : days < 15 ? 'yellow' : 'green' %>"><%= days %>d</span><% } else { %>—<% } %></td>
+      <td><%= c.fw_count %></td>
+      <td><%= c.auto_renew ? '✓' : '—' %></td>
+      <td class="dim"><%= new Date(c.created_at).toISOString().slice(0,10) %></td>
+    </tr>
+  <% }) %>
+  <% if (!certs.length) { %><tr><td colspan="7" class="empty">No certificates yet.</td></tr><% } %>
+  </tbody>
+</table>
+<%- include('../partials/tail') %>

@@ -1,0 +1,66 @@
+<%- include('../partials/head', { title }) %>
+<div class="page-head">
+  <div>
+    <h1>Platform admin</h1>
+    <p class="sub">Organizations, global certificate posture, cross-tenant audit.</p>
+  </div>
+  <a class="btn" href="/admin/audit">Global audit log</a>
+</div>
+
+<h2>Organizations</h2>
+<table>
+  <thead><tr><th>Name</th><th>Status</th><th>Contact</th><th>Users</th><th>Firewalls</th><th>Certs</th><th>Next expiry</th><th></th></tr></thead>
+  <tbody>
+  <% orgs.forEach(o => { %>
+    <tr>
+      <td><strong><%= o.name %></strong></td>
+      <td><span class="badge <%= o.status === 'active' ? 'green' : 'red' %>"><%= o.status %></span></td>
+      <td class="dim"><%= o.contact_email %></td>
+      <td><%= o.user_count %></td>
+      <td><%= o.firewall_count %></td>
+      <td><%= o.cert_count %></td>
+      <td class="dim"><%= o.next_expiry ? new Date(o.next_expiry).toISOString().slice(0,10) : '—' %></td>
+      <td class="actions">
+        <form class="inline" method="post" action="/admin/orgs/<%= o.id %>/open">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button class="btn small" type="submit">Open</button>
+        </form>
+        <form class="inline" method="post" action="/admin/orgs/<%= o.id %>/status">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="status" value="<%= o.status === 'active' ? 'suspended' : 'active' %>">
+          <button class="btn small <%= o.status === 'active' ? 'danger' : '' %>" type="submit"><%= o.status === 'active' ? 'Suspend' : 'Reactivate' %></button>
+        </form>
+      </td>
+    </tr>
+  <% }) %>
+  <% if (!orgs.length) { %><tr><td colspan="8" class="empty">No organizations yet — create the first one below.</td></tr><% } %>
+  </tbody>
+</table>
+
+<h2>Create organization</h2>
+<form method="post" action="/admin/orgs" class="stack">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <label class="field">Name <input type="text" name="name" required></label>
+  <label class="field">Contact email (used for ACME registration & notifications)
+    <input type="email" name="contact_email" required>
+  </label>
+  <button class="btn primary" type="submit">Create organization</button>
+</form>
+
+<h2>Certificates expiring soonest (all tenants)</h2>
+<table>
+  <thead><tr><th>Organization</th><th>SANs</th><th>Status</th><th>Expires</th><th>Failures</th></tr></thead>
+  <tbody>
+  <% expiring.forEach(c => { %>
+    <tr>
+      <td><%= c.org_name %></td>
+      <td class="mono"><%= (c.san_list || []).join(', ') %></td>
+      <td><span class="badge <%= c.status === 'deployed' ? 'green' : (c.status === 'failed' ? 'red' : 'blue') %>"><%= c.status %></span></td>
+      <td class="dim"><%= c.not_after ? new Date(c.not_after).toISOString().slice(0,16).replace('T',' ') : '—' %></td>
+      <td><%= c.renewal_failures || 0 %></td>
+    </tr>
+  <% }) %>
+  <% if (!expiring.length) { %><tr><td colspan="5" class="empty">No certificates yet.</td></tr><% } %>
+  </tbody>
+</table>
+<%- include('../partials/tail') %>

@@ -1,0 +1,53 @@
+<%- include('../partials/head', { title }) %>
+<div class="page-head">
+  <div><h1>Agents</h1><p class="sub">On-prem connectors that reach your firewalls over the LAN — outbound only, no inbound access required.</p></div>
+</div>
+
+<% if (newAgent) { %>
+<div class="panel req-panel">
+  <h3 style="margin-top:0">Agent “<%= newAgent.name %>” created — enroll it now</h3>
+  <p style="font-size:.9rem">Run the agent on a host inside the network that can reach your firewalls. It connects
+  <strong>out</strong> to <span class="mono"><%= controlPlaneUrl %></span>; nothing inbound is opened. This enrollment
+  token is shown once.</p>
+  <div class="record-box" data-copy>docker run -d --name certportal-agent --restart unless-stopped \
+  -e CONTROL_PLANE_URL=<%= controlPlaneUrl %> \
+  -e ENROLL_TOKEN=<%= newAgent.token %> \
+  -e AGENT_NAME="<%= newAgent.name %>" \
+  -v certportal-agent:/data \
+  certportal/agent:latest</div>
+  <p style="font-size:.85rem;color:var(--text-dim)">After it enrolls, assign firewalls to it from the firewall's edit page.</p>
+</div>
+<% } %>
+
+<table>
+  <thead><tr><th>Name</th><th>Status</th><th>Version</th><th>Firewalls</th><th>Last seen</th><th></th></tr></thead>
+  <tbody>
+  <% agents.forEach(a => { %>
+    <tr>
+      <td><strong><%= a.name %></strong></td>
+      <td>
+        <% if (a.awaiting_enrollment) { %><span class="badge yellow">awaiting enrollment</span>
+        <% } else { %><span class="badge <%= a.status === 'active' ? 'green' : 'gray' %>"><%= a.status %></span><% } %>
+      </td>
+      <td class="dim"><%= a.version || '—' %></td>
+      <td><%= a.firewall_count %></td>
+      <td class="dim"><%= a.last_seen ? new Date(a.last_seen).toISOString().slice(0,16).replace('T',' ') : 'never' %></td>
+      <td>
+        <form class="inline" method="post" action="/agents/<%= a.id %>/delete" data-confirm="Delete agent <%= a.name %>? Its firewalls revert to direct connection.">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button class="btn small danger" type="submit">Delete</button>
+        </form>
+      </td>
+    </tr>
+  <% }) %>
+  <% if (!agents.length) { %><tr><td colspan="6" class="empty">No agents yet. Add one to manage firewalls that CertPortal can't reach directly.</td></tr><% } %>
+  </tbody>
+</table>
+
+<h2>Add agent</h2>
+<form method="post" action="/agents" class="stack">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <label class="field">Name (e.g. datacenter-1) <input type="text" name="name" required></label>
+  <button class="btn primary" type="submit">Create agent</button>
+</form>
+<%- include('../partials/tail') %>

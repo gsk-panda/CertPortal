@@ -1,0 +1,27 @@
+<%- include('../partials/head', { title }) %>
+<div class="page-head">
+  <div><h1><%= global ? 'Global audit log' : 'Audit log' %></h1>
+  <p class="sub">Append-only. Secrets are redacted before storage.</p></div>
+</div>
+<table>
+  <thead><tr><th>When (UTC)</th><% if (global) { %><th>Org</th><% } %><th>User</th><th>Action</th><th>Target</th><th>Detail</th><th>IP</th></tr></thead>
+  <tbody>
+  <% entries.forEach(a => { %>
+    <tr>
+      <td class="dim mono" style="white-space:nowrap"><%= new Date(a.created_at).toISOString().replace('T',' ').slice(0,19) %></td>
+      <% if (global) { %><td><%= a.org_name || '—' %></td><% } %>
+      <td class="dim"><%= a.user_email || 'system' %></td>
+      <td><strong><%= a.action %></strong></td>
+      <td class="dim"><%= a.target_type ? a.target_type + ':' + String(a.target_id).slice(0,8) : '—' %></td>
+      <td class="dim mono" style="font-size:.78rem;max-width:340px;overflow-wrap:anywhere"><%= a.detail ? JSON.stringify(a.detail).slice(0,240) : '' %></td>
+      <td class="dim mono"><%= a.ip || '' %></td>
+    </tr>
+  <% }) %>
+  <% if (!entries.length) { %><tr><td colspan="<%= global ? 7 : 6 %>" class="empty">No entries.</td></tr><% } %>
+  </tbody>
+</table>
+<div class="actions" style="margin-top:1rem">
+  <% if (page > 1) { %><a class="btn small" href="?page=<%= page - 1 %>">← Newer</a><% } %>
+  <% if (entries.length === 50) { %><a class="btn small" href="?page=<%= page + 1 %>">Older →</a><% } %>
+</div>
+<%- include('../partials/tail') %>

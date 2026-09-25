@@ -1,0 +1,34 @@
+<%- include('../partials/head', { title }) %>
+<h1>My account</h1>
+<div class="panel">
+  <dl class="kv">
+    <dt>Email</dt><dd><%= me.email %></dd>
+    <dt>Role</dt><dd><%= me.role.replace('_',' ') %></dd>
+    <dt>Last login</dt><dd><%= me.last_login ? new Date(me.last_login).toISOString().replace('T',' ').slice(0,19) + ' UTC' : '—' %></dd>
+    <dt>Two-factor</dt><dd><%= totpEnabled ? 'enabled' : 'disabled' %></dd>
+  </dl>
+</div>
+
+<h2>Change password</h2>
+<form method="post" action="/account/password" class="stack" data-match-password>
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <label class="field">Current password <input type="password" name="current" required autocomplete="current-password"></label>
+  <label class="field">New password (12+ characters) <input type="password" name="password" minlength="12" required autocomplete="new-password"></label>
+  <label class="field">Confirm new password <input type="password" name="password_confirm" minlength="12" required autocomplete="new-password"></label>
+  <button class="btn primary" type="submit">Change password</button>
+</form>
+
+<h2>Two-factor authentication (TOTP)</h2>
+<% if (!totpEnabled) { %>
+  <form method="post" action="/account/totp/start">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <button class="btn" type="submit">Enable 2FA</button>
+  </form>
+<% } else { %>
+  <form method="post" action="/account/totp/disable" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label class="field">Current code <input type="text" name="code" inputmode="numeric" pattern="\d{6}" maxlength="6" required></label>
+    <button class="btn danger" type="submit">Disable 2FA</button>
+  </form>
+<% } %>
+<%- include('../partials/tail') %>

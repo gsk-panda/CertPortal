@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %> · CertPortal</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="brand">CertPortal<span class="dot">●</span></div>
+    <h1><%= title %></h1>
+    <% if (flash) { %><div class="flash <%= flash.type %>"><%= flash.message %></div><% } %>
+    <% if (typeof invite !== 'undefined' && invite) { %>
+      <p style="font-size:.9rem;color:var(--text-dim)">Your account <strong><%= email %></strong> is ready —
+      choose a password to activate it. CertPortal automates SSL/TLS certificates for your
+      Palo Alto Networks firewalls: issuance, renewal, deployment, and alerts.</p>
+    <% } %>
+    <form method="post" action="/password-reset/<%= token %>" class="stack" data-match-password>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label class="field"><%= (typeof invite !== 'undefined' && invite) ? 'Choose a password (12+ characters)' : 'New password (12+ characters)' %>
+        <input type="password" name="password" minlength="12" required autofocus autocomplete="new-password">
+      </label>
+      <label class="field">Confirm password
+        <input type="password" name="password_confirm" minlength="12" required autocomplete="new-password">
+      </label>
+      <button class="btn primary" type="submit"><%= (typeof invite !== 'undefined' && invite) ? 'Activate account' : 'Set password' %></button>
+    </form>
+    <% if (typeof invite !== 'undefined' && invite) { %>
+      <p style="margin-top:1rem;font-size:.82rem;color:var(--text-dim)">Tip: after signing in, enable two-factor authentication under “My account”.</p>
+    <% } %>
+  </div>
+</div>
+</body>
+</html>

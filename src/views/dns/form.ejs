@@ -1,0 +1,39 @@
+<%- include('../partials/head', { title }) %>
+<h1>Add DNS provider</h1>
+<form method="post" action="/dns-providers" class="stack" style="max-width:560px">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <label class="field">Label
+    <input type="text" name="label" required placeholder="e.g. Corp Cloudflare">
+  </label>
+  <label class="field">Type
+    <select name="type" id="dns-type">
+      <% Object.entries(types).forEach(([key, def]) => { %>
+        <option value="<%= key %>"><%= def.label %></option>
+      <% }) %>
+    </select>
+  </label>
+
+  <% Object.entries(types).forEach(([key, def]) => { %>
+    <div class="dns-fields" data-type="<%= key %>" style="display:none">
+      <% def.fields.forEach(f => { %>
+        <label class="field" style="margin-bottom:.7rem"><%= f.label %>
+          <input type="<%= f.secret ? 'password' : 'text' %>" name="cred_<%= f.name %>" autocomplete="off">
+        </label>
+      <% }) %>
+      <% if (key === 'acme_dns_cname') { %>
+        <p style="font-size:.87rem;color:var(--text-dim)">No credentials needed. Each domain you register gets a unique
+        delegation target; you create <em>one</em> permanent CNAME per domain and never touch DNS again.</p>
+      <% } %>
+      <% if (key === 'manual') { %>
+        <p style="font-size:.87rem;color:var(--text-dim)">At every issuance/renewal an operator must create the shown TXT
+        records manually. Not compatible with unattended renewals — for dev/testing.</p>
+      <% } %>
+    </div>
+  <% }) %>
+
+  <div class="actions">
+    <button class="btn primary" type="submit">Add provider</button>
+    <a class="btn" href="/dns-providers">Cancel</a>
+  </div>
+</form>
+<%- include('../partials/tail') %>

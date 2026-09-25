@@ -1,0 +1,61 @@
+<%- include('../partials/head', { title }) %>
+<h1>New certificate</h1>
+<% warnings.forEach(w => { %>
+  <div class="banner-warn">Heads-up: <%= w.count %> certificates issued for <strong><%= w.reg %></strong> in the last 7 days.
+  Let's Encrypt allows 50 per registered domain per week.</div>
+<% }) %>
+
+<% const verified = domains.filter(d => d.ownership_verified); %>
+<% if (!verified.length) { %>
+  <div class="banner-warn">No ownership-verified domains. <a href="/domains">Verify a domain first →</a></div>
+<% } %>
+
+<form method="post" action="/certificates" class="stack" style="max-width:620px">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+  <h2 style="margin-top:.5rem">1 · Names</h2>
+  <label class="field">Domain (must be ownership-verified)
+    <select name="domain_id" required>
+      <% verified.forEach(d => { %>
+        <option value="<%= d.id %>"><%= d.fqdn %> — via <%= d.provider_label %> (<%= d.provider_type %>)</option>
+      <% }) %>
+    </select>
+  </label>
+  <label class="check"><input type="checkbox" name="wildcard"> Include wildcard (<span class="mono">*.domain</span>) — DNS-01 supports this</label>
+  <label class="field">Additional SANs (space/comma separated, must be under the selected domain)
+    <input type="text" name="sans" placeholder="portal.vpn.example.com gw1.vpn.example.com">
+  </label>
+  <label class="field">Key type
+    <select name="key_type">
+      <option value="ecdsa_p256">ECDSA P-256 (default, recommended)</option>
+      <option value="rsa_2048">RSA-2048</option>
+    </select>
+  </label>
+
+  <h2>2 · Deployment targets</h2>
+  <% if (!firewalls.length) { %>
+    <p class="dim" style="font-size:.9rem">No firewalls yet — the certificate can still be issued and downloaded; add firewalls later and use Redeploy.</p>
+  <% } %>
+  <% firewalls.forEach(f => { %>
+    <label class="check"><input type="checkbox" name="firewall_ids" value="<%= f.id %>"> <%= f.name %> <span class="dim mono">(<%= f.mgmt_address %>)</span></label>
+  <% }) %>
+
+  <label class="field">SSL/TLS Service Profile to bind (optional — created/updated via config API)
+    <input type="text" name="ssl_tls_profile" placeholder="gp-portal-profile">
+  </label>
+  <label class="field">GlobalProtect portal name (optional, requires profile above)
+    <input type="text" name="gp_portal">
+  </label>
+  <label class="field">GlobalProtect gateway name (optional, requires profile above)
+    <input type="text" name="gp_gateway">
+  </label>
+  <label class="field">Post-deploy validation endpoint (optional, host[:port] — after commit, CertPortal opens a TLS connection and confirms the served serial matches)
+    <input type="text" name="validate_endpoint" placeholder="vpn.example.com:443">
+  </label>
+
+  <div class="actions">
+    <button class="btn primary" type="submit" <%= verified.length ? '' : 'disabled' %>>Issue certificate</button>
+    <a class="btn" href="/certificates">Cancel</a>
+  </div>
+</form>
+<%- include('../partials/tail') %>

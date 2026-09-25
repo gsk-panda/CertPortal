@@ -1,0 +1,4 @@
+certportal.azotech.net {
+	encode gzip
+	reverse_proxy app:3000
+}

@@ -1,0 +1,27 @@
+<%- include('../partials/head', { title }) %>
+<div class="page-head">
+  <div><h1>Domains</h1><p class="sub">Ownership must be proven before certificates are issued. Re-verified every <%= reverifyDays %> days.</p></div>
+  <a class="btn primary" href="/domains/new">Add domain</a>
+</div>
+<table>
+  <thead><tr><th>FQDN</th><th>DNS provider</th><th>Ownership</th><th>Verified</th><th></th></tr></thead>
+  <tbody>
+  <% domains.forEach(d => { %>
+    <tr>
+      <td><a class="mono" href="/domains/<%= d.id %>"><%= d.fqdn %></a></td>
+      <td class="dim"><%= d.provider_label || '—' %><% if (d.provider_type === 'acme_dns_cname') { %> <span class="badge blue">CNAME delegation</span><% } %></td>
+      <td><span class="badge <%= d.ownership_verified ? 'green' : 'yellow' %>"><%= d.ownership_verified ? 'verified' : 'unverified' %></span></td>
+      <td class="dim"><%= d.verified_at ? new Date(d.verified_at).toISOString().slice(0,10) : '—' %></td>
+      <td class="actions">
+        <a class="btn small" href="/domains/<%= d.id %>">Details</a>
+        <form class="inline" method="post" action="/domains/<%= d.id %>/delete" data-confirm="Delete domain <%= d.fqdn %>? Its certificates will be removed.">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button class="btn small danger" type="submit">Delete</button>
+        </form>
+      </td>
+    </tr>
+  <% }) %>
+  <% if (!domains.length) { %><tr><td colspan="5" class="empty">No domains yet.</td></tr><% } %>
+  </tbody>
+</table>
+<%- include('../partials/tail') %>

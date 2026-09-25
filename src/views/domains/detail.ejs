@@ -1,0 +1,44 @@
+<%- include('../partials/head', { title }) %>
+<div class="page-head">
+  <div>
+    <h1 class="mono"><%= domain.fqdn %></h1>
+    <p class="sub">Provider: <%= provider ? provider.label + ' (' + provider.type + ')' : 'none' %></p>
+  </div>
+  <span class="badge <%= domain.ownership_verified ? 'green' : 'yellow' %>" style="font-size:.9rem">
+    <%= domain.ownership_verified ? 'ownership verified' : 'ownership unverified' %>
+  </span>
+</div>
+
+<div class="panel">
+  <h3 style="margin-top:0">Ownership verification</h3>
+  <% if (domain.ownership_verified) { %>
+    <p style="font-size:.9rem">Verified <%= new Date(domain.verified_at).toISOString().replace('T',' ').slice(0,19) %> UTC.
+    Re-verified automatically every <%= reverifyDays %> days — keep the TXT record in place. If verification lapses,
+    renewals for this domain pause and your org is notified.</p>
+  <% } else { %>
+    <p style="font-size:.9rem">Create this TXT record at your DNS host, then click Verify. The check queries your domain's
+    <em>authoritative</em> nameservers directly, so it typically works within a minute of saving the record.</p>
+  <% } %>
+  <div class="record-box" data-copy>_certportal-verify.<%= domain.fqdn %>.  IN  TXT  "<%= domain.verification_token %>"</div>
+  <form class="inline" method="post" action="/domains/<%= domain.id %>/verify">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <button class="btn primary" type="submit"><%= domain.ownership_verified ? 'Re-verify now' : 'Verify' %></button>
+  </form>
+</div>
+
+<% if (cnameTarget) { %>
+<div class="panel">
+  <h3 style="margin-top:0">CNAME delegation (one-time setup)</h3>
+  <p style="font-size:.9rem">This domain uses CNAME delegation: create the record below <strong>once</strong> and all future
+  ACME validations happen inside <span class="mono"><%= acmeDnsZone %></span> (controlled by CertPortal). Your DNS never changes again —
+  wildcards and renewals included.</p>
+  <div class="record-box" data-copy>_acme-challenge.<%= domain.fqdn %>.  IN  CNAME  <%= cnameTarget %>.</div>
+  <form class="inline" method="post" action="/domains/<%= domain.id %>/check-cname">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <button class="btn" type="submit">Check CNAME</button>
+  </form>
+</div>
+<% } %>
+
+<p><a href="/domains">← All domains</a></p>
+<%- include('../partials/tail') %>
