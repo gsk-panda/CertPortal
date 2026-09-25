@@ -5,7 +5,7 @@ const { inGoodStanding } = require('../services/billing/entitlements');
 
 /**
  * Gate tenant features behind an active subscription. Applied to the
- * feature routers but NOT to /billing or /account, so a lapsed/trial-expired
+ * feature routers but NOT to /billing or /account, so a lapsed or legacy-trial-expired
  * customer can always reach the page where they pay. No-op when billing is off.
  * Platform admins acting inside an org are never gated.
  */

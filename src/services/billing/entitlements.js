@@ -3,7 +3,7 @@
 const { query } = require('../../db/pool');
 const { planForOrg, withinLimit } = require('./plans');
 
-const TABLES = { firewalls: 'firewalls', domains: 'domains', certificates: 'certificates' };
+const TABLES = { firewalls: 'firewalls', domains: 'domains', certificates: 'certificates', agents: 'agents' };
 
 /**
  * Check whether the org may create another `resource`. Returns
@@ -20,12 +20,14 @@ async function checkLimit(req, resource) {
 }
 
 /**
- * Is the org in good billing standing? Grandfathered orgs (plan set, no
+ * Is the org in good billing standing? The free plan always is (its limits
+ * are the only restriction). Grandfathered orgs (plan set, no
  * subscription — e.g. pre-billing tenants on 'enterprise') pass. Trials pass
  * until trial_ends_at. Paid plans need an active/trialing subscription.
  * req.org must include plan, trial_ends_at, sub_status (from tenantScope).
  */
 function inGoodStanding(org) {
+  if (org.plan === 'free') return true;
   if (org.plan === 'trial') {
     return !!org.trial_ends_at && new Date(org.trial_ends_at) > new Date();
   }

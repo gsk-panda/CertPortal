@@ -2,17 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Start free trial · CertPortal</title>
+  <title>Create account · CertPortal</title>
   <link rel="stylesheet" href="/static/css/app.css">
 </head>
 <body>
 <div class="auth-wrap">
   <div class="auth-card">
     <div class="brand">CertPortal<span class="dot">●</span></div>
-    <h1>Start your free trial</h1>
+    <h1>Create your free account</h1>
     <% if (flash) { %><div class="flash <%= flash.type %>"><%= flash.message %></div><% } %>
     <p style="font-size:.9rem;color:var(--text-dim)">Automated SSL/TLS certificate management for your Palo Alto
-    firewalls. <%= trialDays %>-day free trial, no card required.</p>
+    firewalls. Free forever for <%= freeLimits.domains %> domain, <%= freeLimits.firewalls %> firewall and
+    <%= freeLimits.agents %> agent; no card required. Upgrade any time for more.</p>
     <form method="post" action="/signup" class="stack" data-match-password>
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <label class="field">Organization name

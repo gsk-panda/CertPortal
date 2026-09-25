@@ -57,6 +57,25 @@ async function checkoutUrl(org, planKey, { successUrl, cancelUrl }) {
   return session.url;
 }
 
+/**
+ * Move an existing subscription to another paid plan (prorated). Used instead
+ * of Checkout when the org already pays, so an upgrade never creates a second
+ * subscription. Returns the updated Stripe subscription.
+ */
+async function changePlan(org, stripeSubscriptionId, planKey) {
+  const plan = PLANS[planKey];
+  if (!plan || !plan.paid) throw new Error(`plan ${planKey} is not purchasable`);
+  if (!plan.priceId) throw new Error(`no Stripe price configured for the ${planKey} plan`);
+  const current = await stripe().subscriptions.retrieve(stripeSubscriptionId);
+  const updated = await stripe().subscriptions.update(stripeSubscriptionId, {
+    items: [{ id: current.items.data[0].id, price: plan.priceId }],
+    proration_behavior: 'create_prorations',
+    metadata: { org_id: org.id, plan: planKey },
+  });
+  await applySubscription(org.id, updated);
+  return updated;
+}
+
 /** Stripe-hosted billing portal (card, invoices, cancel). Returns the URL. */
 async function portalUrl(org, returnUrl) {
   const customerId = await ensureCustomer(org);
@@ -83,8 +102,11 @@ function mapSubscription(sub) {
   // NOT touch organizations.status here — that stays admin-controlled, so a
   // past-due customer can still reach /billing to fix their card.
   const inGoodStanding = status === 'active' || status === 'trialing';
+  // a subscription that has ended returns the org to the free tier rather
+  // than locking it out; existing resources stay, new ones need an upgrade.
+  const orgPlan = status === 'canceled' ? 'free' : plan;
   const periodEnd = sub.current_period_end ? new Date(sub.current_period_end * 1000) : null;
-  return { plan, status, inGoodStanding, periodEnd, stripeSubscriptionId: sub.id, customerId: sub.customer };
+  return { plan, orgPlan, status, inGoodStanding, periodEnd, stripeSubscriptionId: sub.id, customerId: sub.customer };
 }
 
 /** Apply a subscription-shaped change to our tables + the org. */
@@ -102,7 +124,7 @@ async function applySubscription(orgId, sub) {
        updated_at = now()`,
     [orgId, m.customerId, m.stripeSubscriptionId, m.plan, m.status, m.periodEnd]
   );
-  await query('UPDATE organizations SET plan = COALESCE($2, plan) WHERE id = $1', [orgId, m.plan]);
+  await query('UPDATE organizations SET plan = COALESCE($2, plan) WHERE id = $1', [orgId, m.orgPlan]);
   await audit({ orgId, action: 'billing.subscription_updated', targetType: 'organization', targetId: orgId,
     detail: { plan: m.plan, status: m.status } });
   return m;
@@ -157,6 +179,6 @@ async function handleEvent(event) {
 }
 
 module.exports = {
-  ensureCustomer, checkoutUrl, portalUrl, parseWebhook,
+  ensureCustomer, checkoutUrl, changePlan, portalUrl, parseWebhook,
   mapSubscription, applySubscription, handleEvent, orgIdForEvent,
 };

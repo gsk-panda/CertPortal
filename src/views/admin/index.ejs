@@ -9,12 +9,23 @@
 
 <h2>Organizations</h2>
 <table>
-  <thead><tr><th>Name</th><th>Status</th><th>Contact</th><th>Users</th><th>Firewalls</th><th>Certs</th><th>Next expiry</th><th></th></tr></thead>
+  <thead><tr><th>Name</th><th>Status</th><th>Plan</th><th>Contact</th><th>Users</th><th>Firewalls</th><th>Certs</th><th>Next expiry</th><th></th></tr></thead>
   <tbody>
   <% orgs.forEach(o => { %>
     <tr>
       <td><strong><%= o.name %></strong></td>
       <td><span class="badge <%= o.status === 'active' ? 'green' : 'red' %>"><%= o.status %></span></td>
+      <td>
+        <% if (billingEnabled) { %>
+          <form class="inline" method="post" action="/admin/orgs/<%= o.id %>/plan">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <select name="plan" aria-label="Plan for <%= o.name %>">
+              <% planKeys.forEach(k => { %><option value="<%= k %>" <%= k === o.plan ? 'selected' : '' %>><%= k %></option><% }) %>
+            </select>
+            <button class="btn small" type="submit">Set</button>
+          </form>
+        <% } else { %><span class="dim"><%= o.plan %></span><% } %>
+      </td>
       <td class="dim"><%= o.contact_email %></td>
       <td><%= o.user_count %></td>
       <td><%= o.firewall_count %></td>
@@ -33,7 +44,7 @@
       </td>
     </tr>
   <% }) %>
-  <% if (!orgs.length) { %><tr><td colspan="8" class="empty">No organizations yet — create the first one below.</td></tr><% } %>
+  <% if (!orgs.length) { %><tr><td colspan="9" class="empty">No organizations yet — create the first one below.</td></tr><% } %>
   </tbody>
 </table>
 

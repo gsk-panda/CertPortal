@@ -66,7 +66,6 @@ const config = {
     priceStarter: process.env.STRIPE_PRICE_STARTER || '',
     pricePro: process.env.STRIPE_PRICE_PRO || '',
     priceEnterprise: process.env.STRIPE_PRICE_ENTERPRISE || '',
-    trialDays: parseInt(process.env.TRIAL_DAYS || '14', 10),
   },
   cookieSecure: bool(process.env.COOKIE_SECURE, false),
   // Renewal engine

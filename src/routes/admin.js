@@ -6,6 +6,7 @@ const { z } = require('zod');
 const { query } = require('../db/pool');
 const { auditReq } = require('../services/audit');
 const { validateBody } = require('../middleware/validate');
+const { PLANS } = require('../services/billing/plans');
 
 const router = express.Router();
 
@@ -24,7 +25,7 @@ router.get('/', async (req, res, next) => {
       FROM certificates c JOIN organizations o ON o.id = c.org_id
       WHERE c.not_after IS NOT NULL
       ORDER BY c.not_after ASC LIMIT 25`);
-    res.render('admin/index', { title: 'Platform admin', orgs: orgs.rows, expiring: expiring.rows });
+    res.render('admin/index', { title: 'Platform admin', orgs: orgs.rows, expiring: expiring.rows, planKeys: Object.keys(PLANS) });
   } catch (err) { next(err); }
 });
 
@@ -60,6 +61,18 @@ router.post('/orgs/:id/status',
       if (rowCount) {
         await auditReq(req, req.body.status === 'suspended' ? 'org.suspended' : 'org.reactivated', 'organization', req.params.id);
       }
+      res.redirect('/admin');
+    } catch (err) { next(err); }
+  });
+
+// Set an org's plan by hand (comp an account, fix a mismatch). A later Stripe
+// webhook for the org's subscription will overwrite this.
+router.post('/orgs/:id/plan',
+  validateBody(z.object({ plan: z.enum(Object.keys(PLANS)), _csrf: z.string() })),
+  async (req, res, next) => {
+    try {
+      const { rowCount } = await query('UPDATE organizations SET plan = $1 WHERE id = $2', [req.body.plan, req.params.id]);
+      if (rowCount) await auditReq(req, 'org.plan_changed', 'organization', req.params.id, { plan: req.body.plan });
       res.redirect('/admin');
     } catch (err) { next(err); }
   });

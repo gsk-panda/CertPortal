@@ -19,9 +19,12 @@ hosted instance at **https://certportal.azotech.net** (emails arrive from
 | **Client Admin** | One organization | Manage users, DNS providers, domains, firewalls, certificates, notifications |
 | **Client Viewer** | One organization | Read-only: see everything, change nothing |
 
-- There is **no self-service signup**. A Platform Admin creates each
-  organization and invites its first Client Admin; that admin then invites
-  their own team. New users receive an email with a set-password link —
+- Anyone can **create a free account** at `/signup` (when self-serve signup
+  is enabled). This creates their organization and makes them its Client
+  Admin; they then invite their own team. The free plan includes 1 domain,
+  1 certificate, 1 firewall and 1 agent and never expires; the **Billing**
+  page upgrades to a paid plan for more. A Platform Admin can still create
+  organizations and invite their first Client Admin directly. New users receive an email with a set-password link —
   passwords are never chosen by or shared with administrators.
 - **Forgot password** on the sign-in page emails a single-use reset link
   (valid 1 hour).
