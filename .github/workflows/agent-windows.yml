@@ -96,16 +96,25 @@ jobs:
           path: '*.log'
 
   release:
-    # tag agent-vX.Y.Z to publish; the portal links to releases/latest
-    if: startsWith(github.ref, 'refs/tags/agent-v')
+    # every agent version merged to main is published as release agent-v<version>
+    # (the portal links to releases/latest); pushing an agent-v* tag also works
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/agent-v'))
     needs: install-test
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+      - name: Release tag
+        id: tag
+        run: echo "tag=agent-v$(node -p "require('./agent/package.json').version")" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@v4
         with:
           name: certportal-agent-msi
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: CertPortal Agent ${{ steps.tag.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
           files: certportal-agent.msi

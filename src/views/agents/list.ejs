@@ -10,9 +10,12 @@
   <strong>out</strong> to <span class="mono"><%= controlPlaneUrl %></span>; nothing inbound is opened. This enrollment
   token is shown once.</p>
   <h4>Windows</h4>
-  <p style="font-size:.85rem"><a href="<%= agentMsiUrl %>">Download certportal-agent.msi</a>, then run this in an
-  administrator PowerShell in the folder you saved it to. It installs and starts the <span class="mono">CertPortal Agent</span> Windows service.</p>
-  <div class="record-box" data-copy>msiexec /i certportal-agent.msi CONTROL_PLANE_URL=<%= controlPlaneUrl %> ENROLL_TOKEN=<%= newAgent.token %> AGENT_NAME="<%= newAgent.name %>" /qb</div>
+  <p style="font-size:.85rem"><a class="btn small" href="<%= agentMsiUrl %>">Download certportal-agent.msi</a></p>
+  <p style="font-size:.85rem">Then open PowerShell as administrator in the folder you saved it to and run this. It installs and
+  starts the <span class="mono">CertPortal Agent</span> Windows service and writes an install log next to the MSI.</p>
+  <div class="record-box" data-copy>msiexec /i certportal-agent.msi CONTROL_PLANE_URL=<%= controlPlaneUrl %> ENROLL_TOKEN=<%= newAgent.token %> AGENT_NAME="<%= newAgent.name %>" /qb /l*v certportal-agent-install.log</div>
+  <p style="font-size:.85rem;color:var(--text-dim)">When it's running, the Start menu shortcut <strong>CertPortal Agent Status</strong>
+  shows whether it's connected.</p>
   <h4>Linux (Docker)</h4>
   <div class="record-box" data-copy>docker run -d --name certportal-agent --restart unless-stopped \
   -e CONTROL_PLANE_URL=<%= controlPlaneUrl %> \
@@ -48,6 +51,16 @@
   <% if (!agents.length) { %><tr><td colspan="6" class="empty">No agents yet. Add one to manage firewalls that CertPortal can't reach directly.</td></tr><% } %>
   </tbody>
 </table>
+
+<h2>Install the agent</h2>
+<p style="font-size:.9rem">The agent runs inside your network and reaches your firewalls over the LAN. Create an agent below to get its
+one-time enrollment token and the exact install command.</p>
+<ul style="font-size:.9rem">
+  <li><strong>Windows:</strong> <a href="<%= agentMsiUrl %>">Download certportal-agent.msi</a> (Windows 10/11 or Server 2016+, 64-bit), then run
+  <span class="mono">msiexec /i certportal-agent.msi CONTROL_PLANE_URL=<%= controlPlaneUrl %> ENROLL_TOKEN=&lt;token&gt; AGENT_NAME="&lt;name&gt;" /qb</span> as administrator.
+  To update, run the new MSI; the agent keeps its enrollment. To remove it, uninstall <em>CertPortal Agent</em> in Settings → Apps.</li>
+  <li><strong>Linux:</strong> run the <span class="mono">certportal/agent</span> Docker image (command shown when you create the agent).</li>
+</ul>
 
 <h2>Add agent</h2>
 <form method="post" action="/agents" class="stack">
